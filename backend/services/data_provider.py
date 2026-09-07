@@ -16,7 +16,20 @@ from datetime import datetime, timezone
 from typing import Optional
 import pandas as pd
 import yfinance as yf
-try: from curl_cffi import requests as cffi_requests _SESSION = cffi_requests.Session(impersonate="chrome") except Exception: _SESSION = None
+
+# Yahoo Finance bloquea muy seguido las peticiones que vienen de IPs de
+# proveedores cloud (Railway, Render, AWS, etc.) porque las detecta como
+# trafico de "centro de datos" en vez de un navegador real. Usamos curl_cffi
+# para que las peticiones imiten la huella digital (TLS fingerprint) de un
+# navegador Chrome real, lo cual evita ese bloqueo en la gran mayoria de los
+# casos. Si igualmente falla, es una limitacion de la fuente de datos
+# gratuita, no de la aplicacion (ver README, seccion de limitaciones).
+try:
+    from curl_cffi import requests as cffi_requests
+    _SESSION = cffi_requests.Session(impersonate="chrome")
+except Exception:
+    _SESSION = None
+
 
 class DataProvider(ABC):
     @abstractmethod
@@ -74,7 +87,10 @@ class YFinanceProvider(DataProvider):
       - Fundamentales históricos limitados (no siempre hay serie larga).
     """
 
-   def _ticker(self, ticker: str) -> yf.Ticker: if _SESSION is not None: return yf.Ticker(ticker.upper().strip(), session=_SESSION) return yf.Ticker(ticker.upper().strip())
+    def _ticker(self, ticker: str) -> yf.Ticker:
+        if _SESSION is not None:
+            return yf.Ticker(ticker.upper().strip(), session=_SESSION)
+        return yf.Ticker(ticker.upper().strip())
 
     def get_price_history(self, ticker: str, period: str = "1y", interval: str = "1d") -> pd.DataFrame:
         t = self._ticker(ticker)
