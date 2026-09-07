@@ -141,7 +141,7 @@ def api_portfolio(positions: List[dict] = Body(...)):
 # --------------------------------------------------------------------------
 # Frontend estatico
 # --------------------------------------------------------------------------
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 
 if FRONTEND_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIR)), name="assets")
