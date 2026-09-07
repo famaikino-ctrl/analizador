@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockLens — Análisis técnico y fundamental</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><span class="dot"></span>StockLens</div>
+
+  <form class="ticker-form" id="ticker-form">
+    <input type="text" id="ticker-input" name="ticker" placeholder="Ticker, ej: NVDA" autocomplete="off" required>
+    <button type="submit" class="btn btn-primary" id="analyze-btn">ANALIZAR</button>
+  </form>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="analysis">Análisis</button>
+    <button class="tab-btn" data-tab="compare">Comparar</button>
+    <button class="tab-btn" data-tab="portfolio">Portafolio</button>
+  </div>
+
+  <button class="theme-toggle" id="theme-toggle" title="Cambiar tema">🌙</button>
+</div>
+
+<div class="container">
+
+  <!-- ========================= TAB: ANALYSIS ========================= -->
+  <div id="tab-analysis">
+    <div id="analysis-empty" class="empty-state">
+      <h2>Introduce un ticker para comenzar</h2>
+      <p>Ej: AAPL, NVDA, MSFT, AMZN, TSLA, SPY, QQQ, META, GOOGL</p>
+    </div>
+
+    <div id="analysis-loading" class="loader hidden">
+      <div class="spinner"></div> Obteniendo datos y calculando indicadores...
+    </div>
+
+    <div id="analysis-error" class="error-banner hidden"></div>
+
+    <div id="analysis-content" class="hidden">
+
+      <!-- Header: nombre / precio / variación -->
+      <div class="grid grid-4" style="margin-bottom:16px;">
+        <div class="card card-lg" style="grid-column:span 2;">
+          <div class="card-title" id="company-sector">SECTOR — INDUSTRIA</div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;">
+            <div>
+              <div style="font-size:20px;font-weight:700;" id="company-name">—</div>
+              <div class="stat-sub" id="company-exchange">—</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="stat-value" id="quote-price">—</div>
+              <div id="quote-change" class="stat-sub">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Market Cap</div>
+          <div class="stat-value mono" id="quote-mcap" style="font-size:20px;">—</div>
+          <div class="stat-sub" id="quote-volume">Vol: —</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Rango 52 semanas</div>
+          <div class="stat-value mono" id="quote-52w" style="font-size:16px;">—</div>
+          <div class="stat-sub" id="quote-updated">—</div>
+        </div>
+      </div>
+
+      <!-- TENDENCIA / SCORE / SEÑAL -->
+      <div class="grid grid-3">
+        <div class="card">
+          <div class="card-title">Tendencia</div>
+          <div id="trend-rows"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Score cuantitativo (0-100)</div>
+          <div style="display:flex;align-items:baseline;gap:10px;">
+            <div class="stat-value mono" id="score-total" style="font-size:34px;">—</div>
+            <span class="pill" id="score-pill">—</span>
+          </div>
+          <div class="stat-sub">Sistema educativo, no es asesoramiento financiero.</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Señal operativa</div>
+          <div class="stat-value" id="signal-value" style="font-size:26px;">—</div>
+          <div class="stat-sub" id="signal-sub">Basada en puntuación combinada, no en un único indicador.</div>
+        </div>
+      </div>
+
+      <!-- PRECIO OBJETIVO -->
+      <div class="section-heading"><span class="arrow">↓</span> Precio objetivo</div>
+      <div class="grid grid-4">
+        <div class="card"><div class="card-title">Precio actual</div><div class="stat-value mono" id="pt-current">—</div></div>
+        <div class="card"><div class="card-title">Conservador</div><div class="stat-value mono" id="pt-conservative">—</div></div>
+        <div class="card"><div class="card-title">Base</div><div class="stat-value mono" id="pt-base">—</div></div>
+        <div class="card"><div class="card-title">Optimista</div><div class="stat-value mono" id="pt-optimistic">—</div></div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">Potencial y métodos usados</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div class="stat-value mono" id="pt-upside" style="font-size:22px;">—</div>
+          <div class="stat-sub" id="pt-note" style="max-width:600px;">—</div>
+        </div>
+      </div>
+
+      <!-- SOPORTES / RESISTENCIAS -->
+      <div class="section-heading"><span class="arrow">↓</span> Soportes y resistencias</div>
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">Resistencias</div>
+          <table><thead><tr><th>Nivel</th><th>Precio</th><th>Dist.</th><th>Fuerza</th></tr></thead>
+          <tbody id="resistances-table"></tbody></table>
+        </div>
+        <div class="card">
+          <div class="card-title">Soportes</div>
+          <table><thead><tr><th>Nivel</th><th>Precio</th><th>Dist.</th><th>Fuerza</th></tr></thead>
+          <tbody id="supports-table"></tbody></table>
+        </div>
+      </div>
+
+      <!-- FIBONACCI -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">Fibonacci (movimiento relevante más reciente)</div>
+        <div class="stat-sub" id="fib-context" style="margin-bottom:10px;">—</div>
+        <table><thead><tr><th>Nivel</th><th>Precio</th><th>Coincide con S/R</th></tr></thead>
+        <tbody id="fib-table"></tbody></table>
+      </div>
+
+      <!-- ENTRADA / STOP / OBJETIVOS -->
+      <div class="section-heading"><span class="arrow">↓</span> Conclusión y plan operativo</div>
+      <div class="conclusion-banner card" id="conclusion-banner">
+        <div class="conclusion-signal" id="conclusion-signal">—</div>
+        <div class="conclusion-meta" id="conclusion-meta"></div>
+      </div>
+
+      <div class="grid grid-4" style="margin-top:16px;">
+        <div class="card"><div class="card-title">Entrada ideal</div><div class="stat-value mono" id="entry-range" style="font-size:19px;">—</div></div>
+        <div class="card"><div class="card-title">Stop loss técnico</div><div class="stat-value mono" id="stop-loss" style="font-size:19px;">—</div></div>
+        <div class="card"><div class="card-title">Objetivos</div><div class="stat-value mono" id="targets" style="font-size:16px;">—</div></div>
+        <div class="card"><div class="card-title">Riesgo / Beneficio</div><div class="stat-value mono" id="risk-reward" style="font-size:19px;">—</div></div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">¿Qué invalida esta estrategia?</div>
+        <div id="invalidation-text" style="font-size:13.5px;color:var(--text-dim);">—</div>
+      </div>
+
+      <!-- ESTRATEGIAS -->
+      <div class="section-heading">Estrategias de entrada</div>
+      <div class="grid grid-3" id="strategies-grid"></div>
+
+      <!-- GRÁFICO -->
+      <div class="section-heading"><span class="arrow">↓</span> Gráfico principal</div>
+      <div class="card">
+        <div class="timeframe-row" id="timeframe-row">
+          <button class="tf-btn" data-tf="1D">1D</button>
+          <button class="tf-btn" data-tf="1W">1W</button>
+          <button class="tf-btn" data-tf="1M">1M</button>
+          <button class="tf-btn" data-tf="3M">3M</button>
+          <button class="tf-btn" data-tf="6M">6M</button>
+          <button class="tf-btn active" data-tf="1Y">1Y</button>
+          <button class="tf-btn" data-tf="3Y">3Y</button>
+          <button class="tf-btn" data-tf="5Y">5Y</button>
+          <button class="tf-btn" data-tf="MAX">MAX</button>
+        </div>
+        <div id="chart-container"></div>
+        <div id="volume-container"></div>
+      </div>
+
+      <!-- ANÁLISIS TÉCNICO -->
+      <div class="section-heading"><span class="arrow">↓</span> Análisis técnico</div>
+      <div class="grid grid-4">
+        <div class="card"><div class="card-title">RSI (14)</div><div class="stat-value mono" id="ind-rsi">—</div><div class="stat-sub" id="ind-rsi-interp">—</div></div>
+        <div class="card"><div class="card-title">MACD</div><div class="stat-value mono" id="ind-macd" style="font-size:18px;">—</div><div class="stat-sub" id="ind-macd-interp">—</div></div>
+        <div class="card"><div class="card-title">ADX (14)</div><div class="stat-value mono" id="ind-adx">—</div><div class="stat-sub" id="ind-adx-interp">—</div></div>
+        <div class="card"><div class="card-title">ATR (14)</div><div class="stat-value mono" id="ind-atr">—</div><div class="stat-sub">Volatilidad absoluta</div></div>
+      </div>
+      <div class="grid grid-4" style="margin-top:16px;">
+        <div class="card"><div class="card-title">Bollinger Bands</div><div class="stat-value mono" id="ind-bb" style="font-size:14px;">—</div></div>
+        <div class="card"><div class="card-title">Stochastic RSI</div><div class="stat-value mono" id="ind-stoch" style="font-size:18px;">—</div></div>
+        <div class="card"><div class="card-title">Volumen vs Promedio 20d</div><div class="stat-value mono" id="ind-vol" style="font-size:16px;">—</div></div>
+        <div class="card"><div class="card-title">VWAP (60d acumulado)</div><div class="stat-value mono" id="ind-vwap">—</div></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">Medias móviles</div>
+        <table><thead><tr><th>EMA9</th><th>EMA20</th><th>EMA50</th><th>EMA100</th><th>EMA200</th><th>SMA20</th><th>SMA50</th><th>SMA200</th></tr></thead>
+        <tbody><tr id="ma-row"></tr></tbody></table>
+      </div>
+
+      <!-- ALERTAS -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">Alertas activas</div>
+        <div id="alerts-list" class="stat-sub">Sin alertas activas en este momento.</div>
+      </div>
+
+      <!-- DESGLOSE DEL SCORE -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">Desglose del score</div>
+        <div class="score-bars" id="score-breakdown"></div>
+      </div>
+
+      <!-- FUNDAMENTAL -->
+      <div class="section-heading"><span class="arrow">↓</span> Análisis fundamental</div>
+      <div class="card">
+        <table id="fundamentals-table"><tbody></tbody></table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================= TAB: COMPARE ========================= -->
+  <div id="tab-compare" class="hidden">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">Comparar hasta 5 tickers</div>
+      <div class="input-row">
+        <input type="text" id="compare-input" placeholder="NVDA, AMD, AVGO, QCOM, TSM" style="flex:1;text-transform:uppercase;">
+        <button class="btn btn-primary" id="compare-btn">Comparar</button>
+      </div>
+      <div class="stat-sub">Separar tickers por coma. Máximo 5.</div>
+    </div>
+    <div id="compare-loading" class="loader hidden"><div class="spinner"></div> Calculando comparación...</div>
+    <div id="compare-error" class="error-banner hidden"></div>
+    <div class="card hidden" id="compare-results">
+      <table>
+        <thead><tr>
+          <th>Ticker</th><th>Precio</th><th>Var. %</th><th>RSI</th><th>P/E</th>
+          <th>Crec. Ingresos</th><th>ROE</th><th>Margen neto</th><th>Score</th><th>Precio Obj.</th><th>Potencial</th>
+        </tr></thead>
+        <tbody id="compare-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========================= TAB: PORTFOLIO ========================= -->
+  <div id="tab-portfolio" class="hidden">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">Mi cartera</div>
+      <div id="portfolio-rows"></div>
+      <button class="btn btn-ghost" id="add-position-btn" style="margin-top:6px;">+ Agregar posición</button>
+      <button class="btn btn-primary" id="calc-portfolio-btn" style="margin-top:6px;margin-left:8px;">Calcular</button>
+      <div class="stat-sub" style="margin-top:8px;">Los datos de la cartera se guardan solo en tu navegador durante esta sesión.</div>
+    </div>
+    <div id="portfolio-loading" class="loader hidden"><div class="spinner"></div> Calculando cartera...</div>
+    <div id="portfolio-error" class="error-banner hidden"></div>
+    <div class="grid grid-3 hidden" id="portfolio-summary">
+      <div class="card"><div class="card-title">Valor total</div><div class="stat-value mono" id="pf-total">—</div></div>
+    </div>
+    <div class="card hidden" id="portfolio-results" style="margin-top:16px;">
+      <table>
+        <thead><tr>
+          <th>Ticker</th><th>Cant.</th><th>Precio prom.</th><th>Precio actual</th><th>Valor</th>
+          <th>G/P</th><th>G/P %</th><th>Peso %</th><th>Score</th><th>Precio Obj.</th>
+        </tr></thead>
+        <tbody id="portfolio-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    StockLens es una herramienta de análisis cuantitativo y educativo. No constituye asesoramiento financiero ni una recomendación de inversión.<br>
+    Datos provistos por Yahoo Finance a través de yfinance; pueden tener retraso y limitaciones de disponibilidad.
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
