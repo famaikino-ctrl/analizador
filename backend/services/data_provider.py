@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Optional
 import pandas as pd
 import yfinance as yf
-
+try: from curl_cffi import requests as cffi_requests _SESSION = cffi_requests.Session(impersonate="chrome") except Exception: _SESSION = None
 
 class DataProvider(ABC):
     @abstractmethod
@@ -74,8 +74,7 @@ class YFinanceProvider(DataProvider):
       - Fundamentales históricos limitados (no siempre hay serie larga).
     """
 
-    def _ticker(self, ticker: str) -> yf.Ticker:
-        return yf.Ticker(ticker.upper().strip())
+   def _ticker(self, ticker: str) -> yf.Ticker: if _SESSION is not None: return yf.Ticker(ticker.upper().strip(), session=_SESSION) return yf.Ticker(ticker.upper().strip())
 
     def get_price_history(self, ticker: str, period: str = "1y", interval: str = "1d") -> pd.DataFrame:
         t = self._ticker(ticker)
