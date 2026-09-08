@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List
 import math
 
-from services.data_provider import YFinanceProvider
+from services.data_provider import YFinanceProvider, AlphaVantageProvider
 from analysis import analyze_ticker
 
 app = FastAPI(title="Stock Analyzer API")
@@ -19,10 +19,19 @@ app.add_middleware(
 )
 
 # --------------------------------------------------------------------------
-# Para cambiar de proveedor de datos: reemplazar esta línea por otra clase
+# Para cambiar de proveedor de datos: reemplazar esta linea por otra clase
 # que implemente la interfaz DataProvider (ver services/data_provider.py).
+#
+# Se usa AlphaVantageProvider en vez de YFinanceProvider porque Yahoo
+# Finance bloquea las peticiones que vienen de IPs de servidores cloud
+# (Railway, Render, etc.). Alpha Vantage si funciona desde ahi, pero
+# requiere una API key gratuita configurada como variable de entorno
+# ALPHAVANTAGE_API_KEY (ver README, seccion "Desplegar online").
+# Si corres la app en tu propia PC y preferis Yahoo Finance (sin API key
+# y con mas datos fundamentales disponibles), cambia la linea de abajo por:
+#   provider = YFinanceProvider()
 # --------------------------------------------------------------------------
-provider = YFinanceProvider()
+provider = AlphaVantageProvider()
 
 
 def _sanitize(obj):
@@ -141,7 +150,7 @@ def api_portfolio(positions: List[dict] = Body(...)):
 # --------------------------------------------------------------------------
 # Frontend estatico
 # --------------------------------------------------------------------------
-FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 if FRONTEND_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIR)), name="assets")
