@@ -216,3 +216,205 @@ class YFinanceProvider(DataProvider):
         if mean is None and low is None and high is None:
             return None
         return {"low": low, "mean": mean, "high": high, "num_analysts": n}
+
+
+def _av_num(value):
+    """Alpha Vantage devuelve 'None', '-', o cadena vacia para campos no
+    disponibles en vez de omitirlos. Los convertimos a None real."""
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip() in ("", "None", "-", "NaN"):
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
+class AlphaVantageProvider(DataProvider):
+    """Proveedor alternativo basado en Alpha Vantage (www.alphavantage.co).
+
+    Se usa en vez de Yahoo Finance cuando la app corre en un servidor cloud
+    (Railway, Render, etc.), porque Yahoo Finance bloquea muy seguido las
+    peticiones que vienen de esas IPs. Alpha Vantage requiere una API key
+    gratuita (variable de entorno ALPHAVANTAGE_API_KEY).
+
+    Limitaciones del plan gratuito de Alpha Vantage (documentadas para que
+    no sean sorpresa):
+      - 25 peticiones por dia, 5 por minuto.
+      - El historial diario gratuito trae solo los ultimos ~100 dias
+        habiles (~5 meses), por lo que EMA100, EMA200 y SMA200 van a
+        aparecer como "N/D" por falta de datos suficientes.
+      - Algunos fundamentales que si trae Yahoo (free cash flow, deuda,
+        cash, payout ratio) no estan en el endpoint gratuito OVERVIEW de
+        Alpha Vantage y quedan como "N/D".
+      - El precio no es en tiempo real: se actualiza al cierre de cada
+        sesion para las cuentas gratuitas.
+
+    Para reducir el consumo de la cuota diaria, esta clase cachea en
+    memoria (60 segundos) las respuestas de cada endpoint, ya que una sola
+    consulta de analisis llama a 4 metodos distintos de esta clase que
+    pueden compartir los mismos 2 llamados a la API (TIME_SERIES_DAILY y
+    OVERVIEW) en vez de hacer 4 llamados separados.
+    """
+
+    BASE_URL = "https://www.alphavantage.co/query"
+    _CACHE_TTL_SECONDS = 60
+
+    def __init__(self, api_key: Optional[str] = None):
+        import os
+        self.api_key = api_key or os.environ.get("ALPHAVANTAGE_API_KEY", "")
+        self._cache: dict = {}
+
+    def _request(self, params: dict) -> dict:
+        import time
+        import requests
+
+        cache_key = tuple(sorted(params.items()))
+        now = time.time()
+        cached = self._cache.get(cache_key)
+        if cached and (now - cached[0]) < self._CACHE_TTL_SECONDS:
+            return cached[1]
+
+        full_params = dict(params)
+        full_params["apikey"] = self.api_key
+        try:
+            resp = requests.get(self.BASE_URL, params=full_params, timeout=15)
+            data = resp.json()
+        except Exception:
+            data = {}
+
+        self._cache[cache_key] = (now, data)
+        return data
+
+    def _daily_series(self, ticker: str) -> dict:
+        data = self._request({"function": "TIME_SERIES_DAILY", "symbol": ticker.upper()})
+        return data.get("Time Series (Daily)", {}) or {}
+
+    def _overview(self, ticker: str) -> dict:
+        data = self._request({"function": "OVERVIEW", "symbol": ticker.upper()})
+        # Si la clave es invalida, se supero la cuota, o el ticker no existe,
+        # Alpha Vantage devuelve un dict sin los campos esperados (a veces
+        # con "Note", "Information" o "Error Message" en su lugar).
+        if not data or "Symbol" not in data:
+            return {}
+        return data
+
+    def get_price_history(self, ticker: str, period: str = "1y", interval: str = "1d") -> pd.DataFrame:
+        series = self._daily_series(ticker)
+        if not series:
+            return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+        rows = []
+        for date_str, values in series.items():
+            try:
+                rows.append({
+                    "Date": pd.to_datetime(date_str),
+                    "Open": float(values["1. open"]),
+                    "High": float(values["2. high"]),
+                    "Low": float(values["3. low"]),
+                    "Close": float(values["4. close"]),
+                    "Volume": float(values["5. volume"]),
+                })
+            except (KeyError, ValueError):
+                continue
+        if not rows:
+            return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+        df = pd.DataFrame(rows).set_index("Date").sort_index()
+        return df
+
+    def get_quote(self, ticker: str) -> dict:
+        df = self.get_price_history(ticker)
+        overview = self._overview(ticker)
+
+        price = prev_close = day_high = day_low = volume = avg_volume = None
+        change_pct = None
+        if not df.empty:
+            price = float(df["Close"].iloc[-1])
+            day_high = float(df["High"].iloc[-1])
+            day_low = float(df["Low"].iloc[-1])
+            volume = float(df["Volume"].iloc[-1])
+            avg_volume = float(df["Volume"].tail(20).mean())
+            if len(df) >= 2:
+                prev_close = float(df["Close"].iloc[-2])
+                if prev_close:
+                    change_pct = (price - prev_close) / prev_close * 100.0
+
+        week52_high = _av_num(overview.get("52WeekHigh"))
+        week52_low = _av_num(overview.get("52WeekLow"))
+        if week52_high is None and not df.empty:
+            week52_high = float(df["High"].max())
+        if week52_low is None and not df.empty:
+            week52_low = float(df["Low"].min())
+
+        return {
+            "price": price,
+            "prev_close": prev_close,
+            "change_pct": change_pct,
+            "day_high": day_high,
+            "day_low": day_low,
+            "volume": volume,
+            "avg_volume": avg_volume,
+            "week52_high": week52_high,
+            "week52_low": week52_low,
+            "market_cap": _av_num(overview.get("MarketCapitalization")),
+            "currency": overview.get("Currency") or "USD",
+            "exchange": overview.get("Exchange"),
+            "as_of": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def get_company_info(self, ticker: str) -> dict:
+        overview = self._overview(ticker)
+        return {
+            "name": overview.get("Name") or ticker.upper(),
+            "sector": overview.get("Sector"),
+            "industry": overview.get("Industry"),
+            "exchange": overview.get("Exchange"),
+            "currency": overview.get("Currency") or "USD",
+            "website": None,
+            "employees": None,
+            "description": overview.get("Description"),
+        }
+
+    def get_fundamentals(self, ticker: str) -> dict:
+        o = self._overview(ticker)
+
+        def pct(key):
+            v = _av_num(o.get(key))
+            return v if v is None else v  # ya vienen como fraccion (0.12 = 12%)
+
+        return {
+            "revenue": _av_num(o.get("RevenueTTM")),
+            "revenue_growth": _av_num(o.get("QuarterlyRevenueGrowthYOY")),
+            "eps_ttm": _av_num(o.get("EPS")),
+            "eps_forward": None,
+            "ebitda": _av_num(o.get("EBITDA")),
+            "gross_margin": None,
+            "operating_margin": _av_num(o.get("OperatingMarginTTM")),
+            "net_margin": _av_num(o.get("ProfitMargin")),
+            "free_cash_flow": None,
+            "total_debt": None,
+            "total_cash": None,
+            "debt_to_equity": None,
+            "roe": _av_num(o.get("ReturnOnEquityTTM")),
+            "roa": _av_num(o.get("ReturnOnAssetsTTM")),
+            "pe_trailing": _av_num(o.get("TrailingPE")) or _av_num(o.get("PERatio")),
+            "pe_forward": _av_num(o.get("ForwardPE")),
+            "peg_ratio": _av_num(o.get("PEGRatio")),
+            "ps_ratio": _av_num(o.get("PriceToSalesRatioTTM")),
+            "pb_ratio": _av_num(o.get("PriceToBookRatio")),
+            "ev_to_ebitda": _av_num(o.get("EVToEBITDA")),
+            "dividend_yield": _av_num(o.get("DividendYield")),
+            "payout_ratio": None,
+            "beta": _av_num(o.get("Beta")),
+            "shares_outstanding": _av_num(o.get("SharesOutstanding")),
+            "book_value": _av_num(o.get("BookValue")),
+            "earnings_growth": _av_num(o.get("QuarterlyEarningsGrowthYOY")),
+            "roic": None,
+        }
+
+    def get_analyst_target(self, ticker: str) -> Optional[dict]:
+        o = self._overview(ticker)
+        mean = _av_num(o.get("AnalystTargetPrice"))
+        if mean is None:
+            return None
+        return {"low": None, "mean": mean, "high": None, "num_analysts": None}
