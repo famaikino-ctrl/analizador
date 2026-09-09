@@ -76,6 +76,48 @@ def build_alerts(ema_cross_9_20, ema_cross_20_50, ema_cross_50_200, rsi_interp,
     return alerts
 
 
+def classify_trade_style(atr_pct, adx_value, score_total, fundamentals_score):
+    """Sugiere el tipo de operacion mas coherente con el perfil actual de la
+    accion (volatilidad, fuerza de tendencia, fundamentales). Es una guia
+    orientativa basada en patrones cuantitativos, no una regla garantizada:
+    la volatilidad y tendencia pueden cambiar de un dia para el otro."""
+    if atr_pct is None:
+        return {
+            "style": "N/D",
+            "reason": "No hay suficientes datos de volatilidad (ATR) para sugerir un estilo de operacion.",
+        }
+
+    high_vol = atr_pct >= 4.0
+    trending = (adx_value or 0) >= 25
+    good_fundamentals = (fundamentals_score or 0) >= 10
+
+    if score_total < 46:
+        return {
+            "style": "Esperar",
+            "reason": "El score combinado no muestra una senal suficientemente clara para plantear una entrada ahora mismo.",
+        }
+
+    if high_vol and trending:
+        return {
+            "style": "Trade de corto plazo (dias)",
+            "reason": "Alta volatilidad (ATR% elevado) junto con tendencia fuerte: se mueve rapido en ambas direcciones, requiere seguimiento cercano y stops ajustados.",
+        }
+    if trending:
+        return {
+            "style": "Swing trade (dias a semanas)",
+            "reason": "Tendencia definida con volatilidad moderada: encaja con posiciones sostenidas por varios dias a pocas semanas.",
+        }
+    if good_fundamentals:
+        return {
+            "style": "Inversion de mediano/largo plazo (meses)",
+            "reason": "Fundamentales solidos sin una urgencia tecnica particular: perfil mas de acumulacion gradual que de trade rapido.",
+        }
+    return {
+        "style": "Posicion moderada, sin apuro",
+        "reason": "Ni la tendencia ni los fundamentales muestran una senal dominante; conviene esperar mas confirmacion antes de definir el tamano de la posicion.",
+    }
+
+
 def build_conclusion(score: dict, signal: dict, trends: dict, fundamentals_ok: bool,
                       upside_pct, current_price, atr_value, nearest_support, nearest_resistance):
     risk = "Alto"

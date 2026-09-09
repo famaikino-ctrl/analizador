@@ -10,7 +10,8 @@ from levels.support_resistance import detect_levels
 from levels.fibonacci import compute_fibonacci, match_fib_with_levels
 from valuation.price_target import compute_price_target
 from scoring.score import compute_score
-from scoring.signals import signal_from_score, multi_horizon_trend, build_alerts, build_conclusion
+from scoring.signals import signal_from_score, multi_horizon_trend, build_alerts, build_conclusion, classify_trade_style
+from scoring.scanner import compute_breakout_score, compute_momentum_5d
 from strategies.entry_strategies import build_strategies
 
 
@@ -152,6 +153,18 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
     strategies = build_strategies(current_price, atr_value, ma_last["ema20"], ma_last["ema50"],
                                    nearest_support, nearest_resistance, rsi_value)
 
+    # ---------- Estilo de trade sugerido ----------
+    atr_pct = (atr_value / current_price * 100) if (atr_value and current_price) else None
+    trade_style = classify_trade_style(atr_pct, adx_value, score["total"], score["breakdown"]["fundamentales"])
+
+    # ---------- Screener de ruptura (breakout) ----------
+    momentum_5d = compute_momentum_5d(close)
+    breakout = compute_breakout_score(
+        rsi_value, macd_info, adx_value, vol_abnormal,
+        nearest_resistance["distance_pct"] if nearest_resistance else None,
+        momentum_5d,
+    )
+
     # ---------- Serie de velas para el chart ----------
     chart_df = df_chart.tail(500)
     candles = []
@@ -221,6 +234,8 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
         "trends": trends,
         "alerts": alerts,
         "conclusion": conclusion,
+        "trade_style": trade_style,
+        "breakout": breakout,
         "strategies": strategies,
         "chart": {
             "candles": candles,

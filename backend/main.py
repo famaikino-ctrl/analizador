@@ -96,6 +96,46 @@ def api_compare(tickers: str):
     return JSONResponse(content=_sanitize({"tickers": rows}))
 
 
+@app.get("/api/scanner")
+def api_scanner(tickers: str):
+    """Screener de configuraciones de ruptura sobre una lista de tickers
+    (maximo 6, para no agotar la cuota diaria gratuita de la API de datos).
+    tickers: string separado por comas, ej: NVDA,AMD,AAPL,MSFT"""
+    symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()][:6]
+    if not symbols:
+        raise HTTPException(status_code=400, detail="Debes indicar al menos un ticker.")
+
+    results = []
+    for sym in symbols:
+        try:
+            data = analyze_ticker(provider, sym, "6M")
+        except Exception as exc:
+            results.append({"ticker": sym, "error": str(exc)})
+            continue
+        if "error" in data:
+            results.append({"ticker": sym, "error": data["error"]})
+            continue
+
+        results.append({
+            "ticker": sym,
+            "price": data["quote"].get("price"),
+            "change_pct": data["quote"].get("change_pct"),
+            "score": data["score"]["total"],
+            "signal": data["signal"]["signal"],
+            "trade_style": data["trade_style"]["style"],
+            "breakout_score": data["breakout"]["score"],
+            "breakout_label": data["breakout"]["label"],
+            "breakout_color": data["breakout"]["color"],
+            "breakout_flags": data["breakout"]["flags"],
+        })
+
+    ok_results = [r for r in results if "error" not in r]
+    err_results = [r for r in results if "error" in r]
+    ok_results.sort(key=lambda r: r["breakout_score"], reverse=True)
+
+    return JSONResponse(content=_sanitize({"results": ok_results + err_results}))
+
+
 @app.post("/api/portfolio")
 def api_portfolio(positions: List[dict] = Body(...)):
     """positions: [{ "ticker": "AAPL", "quantity": 10, "avg_price": 150.0 }, ...]"""
