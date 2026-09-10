@@ -20,6 +20,7 @@
   <div class="tabs">
     <button class="tab-btn active" data-tab="analysis">Análisis</button>
     <button class="tab-btn" data-tab="compare">Comparar</button>
+    <button class="tab-btn" data-tab="scanner">🔥 Explosivas</button>
     <button class="tab-btn" data-tab="portfolio">Portafolio</button>
   </div>
 
@@ -88,6 +89,23 @@
           <div class="card-title">Señal operativa</div>
           <div class="stat-value" id="signal-value" style="font-size:26px;">—</div>
           <div class="stat-sub" id="signal-sub">Basada en puntuación combinada, no en un único indicador.</div>
+        </div>
+      </div>
+
+      <!-- ESTILO DE TRADE Y BREAKOUT -->
+      <div class="grid grid-2" style="margin-top:16px;">
+        <div class="card">
+          <div class="card-title">Estilo de operación sugerido</div>
+          <div class="stat-value" id="trade-style-value" style="font-size:19px;">—</div>
+          <div class="stat-sub" id="trade-style-reason">—</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Configuración de ruptura (breakout)</div>
+          <div style="display:flex;align-items:baseline;gap:10px;">
+            <div class="stat-value mono" id="breakout-score" style="font-size:26px;">—</div>
+            <span class="pill" id="breakout-pill">—</span>
+          </div>
+          <div id="breakout-flags" class="stat-sub" style="margin-top:6px;"></div>
         </div>
       </div>
 
@@ -235,8 +253,39 @@
     </div>
   </div>
 
+  <!-- ========================= TAB: SCANNER (EXPLOSIVAS) ========================= -->
+  <div id="tab-scanner" class="hidden">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">🔥 Screener de configuraciones de ruptura</div>
+      <p class="stat-sub" style="max-width:700px;">
+        Esto NO predice el futuro ni garantiza que una acción vaya a subir. Combina patrones técnicos
+        (momentum, volumen, cercanía a resistencia, fuerza de tendencia) que históricamente suelen
+        preceder movimientos fuertes — pero pueden fallar. Es una herramienta de apoyo para tu propia
+        investigación, no una señal garantizada.
+      </p>
+      <div class="input-row" style="margin-top:10px;">
+        <input type="text" id="scanner-input" placeholder="NVDA, AMD, AAPL, MSFT (máx. 6)" style="flex:1;text-transform:uppercase;">
+        <button class="btn btn-primary" id="scanner-btn">Escanear</button>
+      </div>
+      <div class="stat-sub">Máximo 6 tickers por búsqueda (cada uno consume cuota de la API de datos).</div>
+    </div>
+    <div id="scanner-loading" class="loader hidden"><div class="spinner"></div> Buscando configuraciones de ruptura...</div>
+    <div id="scanner-error" class="error-banner hidden"></div>
+    <div id="scanner-results" class="grid grid-2"></div>
+  </div>
+
   <!-- ========================= TAB: PORTFOLIO ========================= -->
   <div id="tab-portfolio" class="hidden">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">Cargar varias posiciones de una vez</div>
+      <p class="stat-sub">Pegá una posición por línea, con el formato: <span class="mono">TICKER, CANTIDAD, PRECIO_PROMEDIO</span>.
+      El precio promedio es opcional (dejalo vacío o en 0 si solo querés seguir la acción sin calcular ganancia/pérdida). Ejemplo:</p>
+      <p class="mono stat-sub" style="background:var(--surface-2);padding:8px 10px;border-radius:6px;">AAPL, 80, 0<br>MSFT, 200, 0<br>NVDA, 110, 0</p>
+      <textarea id="bulk-portfolio-input" rows="4" style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-family:var(--font-mono);font-size:13px;" placeholder="AAPL, 80, 0&#10;MSFT, 200, 0"></textarea>
+      <button class="btn btn-ghost" id="bulk-load-btn" style="margin-top:8px;">Cargar lista</button>
+      <div class="stat-sub" style="margin-top:6px;">⚠️ La API gratuita permite 25 consultas por día (2 por posición). Cargá como máximo 10-12 posiciones por día.</div>
+    </div>
+
     <div class="card" style="margin-bottom:18px;">
       <div class="card-title">Mi cartera</div>
       <div id="portfolio-rows"></div>

@@ -59,7 +59,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['analysis', 'compare', 'portfolio'].forEach(tab => {
+    ['analysis', 'compare', 'scanner', 'portfolio'].forEach(tab => {
       document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== btn.dataset.tab);
     });
   });
@@ -150,6 +150,19 @@ function renderAnalysis(d) {
   const sigEl = document.getElementById('signal-value');
   sigEl.textContent = (d.signal.signal === 'COMPRA' ? '🟢 ' : d.signal.signal === 'ESPERAR' ? '🟡 ' : '🔴 ') + d.signal.signal;
   sigEl.style.color = d.signal.color === 'green' ? 'var(--green)' : d.signal.color === 'red' ? 'var(--red)' : 'var(--amber)';
+
+  // Estilo de trade
+  document.getElementById('trade-style-value').textContent = d.trade_style.style;
+  document.getElementById('trade-style-reason').textContent = d.trade_style.reason;
+
+  // Breakout
+  document.getElementById('breakout-score').textContent = d.breakout.score;
+  const breakoutPill = document.getElementById('breakout-pill');
+  breakoutPill.textContent = d.breakout.label;
+  breakoutPill.className = 'pill ' + pillClass(d.breakout.color);
+  document.getElementById('breakout-flags').innerHTML = d.breakout.flags.length
+    ? d.breakout.flags.map(f => `• ${f}`).join('<br>')
+    : 'Sin señales de ruptura detectadas ahora mismo.';
 
   // Precio objetivo
   document.getElementById('pt-current').textContent = fmtMoney(d.quote.price, currency);
@@ -399,22 +412,82 @@ document.getElementById('compare-btn').addEventListener('click', async () => {
 });
 
 // ---------------------------------------------------------------------
-// Portafolio
+// Scanner de rupturas (Explosivas)
 // ---------------------------------------------------------------------
-function addPortfolioRow() {
+document.getElementById('scanner-btn').addEventListener('click', async () => {
+  const raw = document.getElementById('scanner-input').value.trim();
+  if (!raw) return;
+  document.getElementById('scanner-error').classList.add('hidden');
+  document.getElementById('scanner-results').innerHTML = '';
+  document.getElementById('scanner-loading').classList.remove('hidden');
+  try {
+    const res = await fetch(`${API_BASE}/api/scanner?tickers=${encodeURIComponent(raw)}`);
+    if (!res.ok) throw new Error('No se pudo ejecutar el escaneo.');
+    const data = await res.json();
+    document.getElementById('scanner-results').innerHTML = data.results.map(r => {
+      if (r.error) {
+        return `<div class="card"><div class="card-title">${r.ticker}</div><div class="stat-sub">${r.error}</div></div>`;
+      }
+      return `<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-size:17px;font-weight:700;">${r.ticker}</div>
+            <div class="stat-sub">${fmtMoney(r.price)} · ${fmtPct(r.change_pct)}</div>
+          </div>
+          <span class="pill ${pillClass(r.breakout_color)}">${r.breakout_score}/100</span>
+        </div>
+        <div class="stat-sub" style="margin:8px 0 4px;font-weight:600;color:var(--text);">${r.breakout_label}</div>
+        <div class="stat-sub" style="margin-bottom:10px;">
+          ${r.breakout_flags.length ? r.breakout_flags.map(f => `• ${f}`).join('<br>') : 'Sin señales de ruptura detectadas.'}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span class="pill pill-gray">Score general: ${r.score}</span>
+          <span class="pill pill-gray">${r.signal}</span>
+          <span class="pill pill-gray">${r.trade_style}</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    document.getElementById('scanner-error').textContent = err.message;
+    document.getElementById('scanner-error').classList.remove('hidden');
+  } finally {
+    document.getElementById('scanner-loading').classList.add('hidden');
+  }
+});
+function addPortfolioRow(ticker = '', quantity = '', avgPrice = '') {
   const div = document.createElement('div');
   div.className = 'input-row';
   div.innerHTML = `
-    <input type="text" name="ticker" placeholder="TICKER">
-    <input type="number" name="quantity" placeholder="Cantidad" min="0" step="any">
-    <input type="number" name="avg_price" placeholder="Precio promedio" min="0" step="any">
+    <input type="text" name="ticker" placeholder="TICKER" value="${ticker}">
+    <input type="number" name="quantity" placeholder="Cantidad" min="0" step="any" value="${quantity}">
+    <input type="number" name="avg_price" placeholder="Precio promedio" min="0" step="any" value="${avgPrice}">
     <button type="button" class="remove-btn" title="Quitar">✕</button>
   `;
   div.querySelector('.remove-btn').addEventListener('click', () => div.remove());
   document.getElementById('portfolio-rows').appendChild(div);
 }
-document.getElementById('add-position-btn').addEventListener('click', addPortfolioRow);
+document.getElementById('add-position-btn').addEventListener('click', () => addPortfolioRow());
 addPortfolioRow(); addPortfolioRow();
+
+document.getElementById('bulk-load-btn').addEventListener('click', () => {
+  const raw = document.getElementById('bulk-portfolio-input').value.trim();
+  if (!raw) return;
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length > 15) {
+    if (!confirm(`Vas a cargar ${lines.length} posiciones. Con el límite gratuito de 25 consultas/día, probablemente no todas se puedan analizar hoy. ¿Continuar de todas formas?`)) {
+      return;
+    }
+  }
+  document.getElementById('portfolio-rows').innerHTML = '';
+  lines.forEach(line => {
+    const parts = line.split(',').map(p => p.trim());
+    const ticker = (parts[0] || '').toUpperCase();
+    const quantity = parts[1] || '';
+    const avgPrice = parts[2] || '0';
+    if (ticker) addPortfolioRow(ticker, quantity, avgPrice);
+  });
+  document.getElementById('bulk-portfolio-input').value = '';
+});
 
 document.getElementById('calc-portfolio-btn').addEventListener('click', async () => {
   const rows = Array.from(document.querySelectorAll('#portfolio-rows .input-row'));
