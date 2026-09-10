@@ -454,20 +454,40 @@ document.getElementById('scanner-btn').addEventListener('click', async () => {
     document.getElementById('scanner-loading').classList.add('hidden');
   }
 });
-function addPortfolioRow() {
+function addPortfolioRow(ticker = '', quantity = '', avgPrice = '') {
   const div = document.createElement('div');
   div.className = 'input-row';
   div.innerHTML = `
-    <input type="text" name="ticker" placeholder="TICKER">
-    <input type="number" name="quantity" placeholder="Cantidad" min="0" step="any">
-    <input type="number" name="avg_price" placeholder="Precio promedio" min="0" step="any">
+    <input type="text" name="ticker" placeholder="TICKER" value="${ticker}">
+    <input type="number" name="quantity" placeholder="Cantidad" min="0" step="any" value="${quantity}">
+    <input type="number" name="avg_price" placeholder="Precio promedio" min="0" step="any" value="${avgPrice}">
     <button type="button" class="remove-btn" title="Quitar">✕</button>
   `;
   div.querySelector('.remove-btn').addEventListener('click', () => div.remove());
   document.getElementById('portfolio-rows').appendChild(div);
 }
-document.getElementById('add-position-btn').addEventListener('click', addPortfolioRow);
+document.getElementById('add-position-btn').addEventListener('click', () => addPortfolioRow());
 addPortfolioRow(); addPortfolioRow();
+
+document.getElementById('bulk-load-btn').addEventListener('click', () => {
+  const raw = document.getElementById('bulk-portfolio-input').value.trim();
+  if (!raw) return;
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length > 15) {
+    if (!confirm(`Vas a cargar ${lines.length} posiciones. Con el límite gratuito de 25 consultas/día, probablemente no todas se puedan analizar hoy. ¿Continuar de todas formas?`)) {
+      return;
+    }
+  }
+  document.getElementById('portfolio-rows').innerHTML = '';
+  lines.forEach(line => {
+    const parts = line.split(',').map(p => p.trim());
+    const ticker = (parts[0] || '').toUpperCase();
+    const quantity = parts[1] || '';
+    const avgPrice = parts[2] || '0';
+    if (ticker) addPortfolioRow(ticker, quantity, avgPrice);
+  });
+  document.getElementById('bulk-portfolio-input').value = '';
+});
 
 document.getElementById('calc-portfolio-btn').addEventListener('click', async () => {
   const rows = Array.from(document.querySelectorAll('#portfolio-rows .input-row'));

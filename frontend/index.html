@@ -277,6 +277,16 @@
   <!-- ========================= TAB: PORTFOLIO ========================= -->
   <div id="tab-portfolio" class="hidden">
     <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">Cargar varias posiciones de una vez</div>
+      <p class="stat-sub">Pegá una posición por línea, con el formato: <span class="mono">TICKER, CANTIDAD, PRECIO_PROMEDIO</span>.
+      El precio promedio es opcional (dejalo vacío o en 0 si solo querés seguir la acción sin calcular ganancia/pérdida). Ejemplo:</p>
+      <p class="mono stat-sub" style="background:var(--surface-2);padding:8px 10px;border-radius:6px;">AAPL, 80, 0<br>MSFT, 200, 0<br>NVDA, 110, 0</p>
+      <textarea id="bulk-portfolio-input" rows="4" style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 10px;font-family:var(--font-mono);font-size:13px;" placeholder="AAPL, 80, 0&#10;MSFT, 200, 0"></textarea>
+      <button class="btn btn-ghost" id="bulk-load-btn" style="margin-top:8px;">Cargar lista</button>
+      <div class="stat-sub" style="margin-top:6px;">⚠️ La API gratuita permite 25 consultas por día (2 por posición). Cargá como máximo 10-12 posiciones por día.</div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px;">
       <div class="card-title">Mi cartera</div>
       <div id="portfolio-rows"></div>
       <button class="btn btn-ghost" id="add-position-btn" style="margin-top:6px;">+ Agregar posición</button>
