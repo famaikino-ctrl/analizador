@@ -162,8 +162,9 @@ def api_portfolio(positions: List[dict] = Body(...)):
         current_price = data["quote"].get("price") or 0
         current_value = current_price * quantity
         cost_basis = avg_price * quantity
-        gain_loss = current_value - cost_basis
-        gain_loss_pct = (gain_loss / cost_basis * 100) if cost_basis else None
+        has_cost_basis = avg_price > 0
+        gain_loss = (current_value - cost_basis) if has_cost_basis else None
+        gain_loss_pct = (gain_loss / cost_basis * 100) if (has_cost_basis and cost_basis) else None
         total_value += current_value
 
         enriched.append({
@@ -172,8 +173,8 @@ def api_portfolio(positions: List[dict] = Body(...)):
             "avg_price": avg_price,
             "current_price": current_price,
             "current_value": round(current_value, 2),
-            "cost_basis": round(cost_basis, 2),
-            "gain_loss": round(gain_loss, 2),
+            "cost_basis": round(cost_basis, 2) if has_cost_basis else None,
+            "gain_loss": round(gain_loss, 2) if gain_loss is not None else None,
             "gain_loss_pct": round(gain_loss_pct, 2) if gain_loss_pct is not None else None,
             "score": data["score"]["total"],
             "price_target_base": data["price_target"].get("base"),
