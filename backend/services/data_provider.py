@@ -260,6 +260,8 @@ class AlphaVantageProvider(DataProvider):
 
     BASE_URL = "https://www.alphavantage.co/query"
     _CACHE_TTL_SECONDS = 60
+    _MIN_SECONDS_BETWEEN_CALLS = 13.0  # el plan gratis permite 5 llamados/min (60/5=12s); dejamos margen
+    _last_call_time = 0.0  # compartido entre instancias, para respetar el limite global de la cuenta
 
     def __init__(self, api_key: Optional[str] = None):
         import os
@@ -276,6 +278,16 @@ class AlphaVantageProvider(DataProvider):
         if cached and (now - cached[0]) < self._CACHE_TTL_SECONDS:
             return cached[1]
 
+        # Throttle: nos aseguramos de no llamar a la API mas rapido que el
+        # limite de 5 solicitudes por minuto del plan gratuito, sin importar
+        # desde que endpoint (analisis individual, comparador, scanner o
+        # portafolio) se este llamando.
+        elapsed = time.time() - AlphaVantageProvider._last_call_time
+        wait = self._MIN_SECONDS_BETWEEN_CALLS - elapsed
+        if wait > 0:
+            time.sleep(wait)
+        AlphaVantageProvider._last_call_time = time.time()
+
         full_params = dict(params)
         full_params["apikey"] = self.api_key
         try:
@@ -284,7 +296,7 @@ class AlphaVantageProvider(DataProvider):
         except Exception:
             data = {}
 
-        self._cache[cache_key] = (now, data)
+        self._cache[cache_key] = (time.time(), data)
         return data
 
     def _daily_series(self, ticker: str) -> dict:
