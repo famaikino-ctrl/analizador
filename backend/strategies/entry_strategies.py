@@ -50,3 +50,59 @@ def build_strategies(current_price, atr_value, ema20, ema50, nearest_support, ne
         strategies["agresiva"] = None
 
     return strategies
+
+
+def build_short_strategies(current_price, atr_value, ema20, ema50, nearest_support, nearest_resistance, rsi_value):
+    """Version espejo de build_strategies para operaciones en corto: el
+    stop va por encima de la entrada, y el objetivo por debajo."""
+    strategies = {}
+
+    # --- Conservadora: esperar rechazo confirmado de EMA50 ---
+    if ema50 is not None and atr_value:
+        entry_c = round(ema50 * 0.995, 2)
+        stop_c = round(ema50 + 1.0 * atr_value, 2)
+        target_c = round(entry_c - 2.0 * atr_value, 2)
+        risk_pct_c = round((stop_c - entry_c) / entry_c * 100, 2) if entry_c else None
+        reward_pct_c = round((entry_c - target_c) / entry_c * 100, 2) if entry_c else None
+        rr_c = round((entry_c - target_c) / (stop_c - entry_c), 2) if (stop_c - entry_c) > 0 else None
+        strategies["conservadora"] = {
+            "descripcion": "Espera rechazo confirmado en EMA50 antes de entrar en corto.",
+            "entrada": entry_c, "stop": stop_c, "objetivo": target_c,
+            "riesgo_pct": risk_pct_c, "potencial_pct": reward_pct_c, "risk_reward": rr_c,
+        }
+    else:
+        strategies["conservadora"] = None
+
+    # --- Moderada: entrada cerca de resistencia con confirmacion ---
+    if nearest_resistance and atr_value:
+        entry_m = round(nearest_resistance["price"] * 0.99, 2)
+        stop_m = round(nearest_resistance["price"] + 0.75 * atr_value, 2)
+        target_m = round(entry_m - 2.5 * atr_value, 2)
+        risk_pct_m = round((stop_m - entry_m) / entry_m * 100, 2) if entry_m else None
+        reward_pct_m = round((entry_m - target_m) / entry_m * 100, 2) if entry_m else None
+        rr_m = round((entry_m - target_m) / (stop_m - entry_m), 2) if (stop_m - entry_m) > 0 else None
+        strategies["moderada"] = {
+            "descripcion": "Entrada cerca de la resistencia mas cercana, confirmando con RSI y volumen.",
+            "entrada": entry_m, "stop": stop_m, "objetivo": target_m,
+            "riesgo_pct": risk_pct_m, "potencial_pct": reward_pct_m, "risk_reward": rr_m,
+        }
+    else:
+        strategies["moderada"] = None
+
+    # --- Agresiva: entrada inmediata por momentum bajista ---
+    if current_price and atr_value:
+        entry_a = round(current_price, 2)
+        stop_a = round(current_price + 1.2 * atr_value, 2)
+        target_a = round(current_price - 2.0 * atr_value, 2)
+        risk_pct_a = round((stop_a - entry_a) / entry_a * 100, 2)
+        reward_pct_a = round((entry_a - target_a) / entry_a * 100, 2)
+        rr_a = round((entry_a - target_a) / (stop_a - entry_a), 2) if (stop_a - entry_a) > 0 else None
+        strategies["agresiva"] = {
+            "descripcion": "Entrada inmediata basada en momentum bajista y cruces de EMA de corto plazo.",
+            "entrada": entry_a, "stop": stop_a, "objetivo": target_a,
+            "riesgo_pct": risk_pct_a, "potencial_pct": reward_pct_a, "risk_reward": rr_a,
+        }
+    else:
+        strategies["agresiva"] = None
+
+    return strategies

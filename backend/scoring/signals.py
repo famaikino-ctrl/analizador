@@ -118,6 +118,53 @@ def classify_trade_style(atr_pct, adx_value, score_total, fundamentals_score):
     }
 
 
+def build_short_conclusion(short_score: dict, trends: dict, current_price, atr_value,
+                            nearest_support, nearest_resistance):
+    """Version espejo de build_conclusion, pero para una operacion en corto:
+    la entrada se busca cerca de una resistencia, el stop va POR ENCIMA
+    (si el precio sube, la venta en corto pierde), y los objetivos apuntan
+    hacia abajo, hacia los soportes."""
+    risk = "Alto"
+    if short_score["total"] >= 60:
+        risk = "Bajo" if short_score["total"] >= 75 else "Medio"
+
+    entry_low = current_price * 0.99 if current_price else None
+    entry_high = current_price
+    if nearest_resistance and atr_value:
+        entry_high = max(current_price, nearest_resistance["price"] - 0.25 * atr_value)
+
+    stop = None
+    if nearest_resistance and atr_value:
+        stop = round(nearest_resistance["price"] + 0.5 * atr_value, 2)
+    elif atr_value and current_price:
+        stop = round(current_price + 2 * atr_value, 2)
+
+    targets = []
+    if atr_value and current_price:
+        targets = [round(current_price - m * atr_value, 2) for m in (1.5, 3.0, 4.5)]
+    if nearest_support:
+        targets = targets[:1] + [nearest_support["price"]] + targets[1:2] if targets else [nearest_support["price"]]
+
+    rr = None
+    if stop and targets and current_price:
+        risk_amount = stop - current_price
+        reward_amount = current_price - targets[0]
+        if risk_amount and risk_amount > 0:
+            rr = round(reward_amount / risk_amount, 2)
+
+    invalidation = "La operacion en corto se invalida si el precio cierra por encima del stop loss, " \
+                   "o si se recupera la resistencia relevante con volumen elevado, o si el score short cae a zona neutral."
+
+    return {
+        "risk": risk,
+        "entry_range": [round(entry_low, 2) if entry_low else None, round(entry_high, 2) if entry_high else None],
+        "stop_loss": stop,
+        "targets": targets,
+        "risk_reward": rr,
+        "invalidation": invalidation,
+    }
+
+
 def build_conclusion(score: dict, signal: dict, trends: dict, fundamentals_ok: bool,
                       upside_pct, current_price, atr_value, nearest_support, nearest_resistance):
     risk = "Alto"

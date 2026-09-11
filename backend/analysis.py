@@ -10,9 +10,10 @@ from levels.support_resistance import detect_levels
 from levels.fibonacci import compute_fibonacci, match_fib_with_levels
 from valuation.price_target import compute_price_target
 from scoring.score import compute_score
-from scoring.signals import signal_from_score, multi_horizon_trend, build_alerts, build_conclusion, classify_trade_style
+from scoring.short_score import compute_short_score, determine_direction
+from scoring.signals import signal_from_score, multi_horizon_trend, build_alerts, build_conclusion, build_short_conclusion, classify_trade_style
 from scoring.scanner import compute_breakout_score, compute_momentum_5d
-from strategies.entry_strategies import build_strategies
+from strategies.entry_strategies import build_strategies, build_short_strategies
 
 
 def _clean(v):
@@ -153,6 +154,20 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
     strategies = build_strategies(current_price, atr_value, ma_last["ema20"], ma_last["ema50"],
                                    nearest_support, nearest_resistance, rsi_value)
 
+    # ---------- Score, conclusion y estrategias del lado SHORT ----------
+    price_down_today = quote.get("change_pct") is not None and quote["change_pct"] < 0
+    short_score = compute_short_score(
+        ema_flags, macd_info, rsi_value, rsi_interp,
+        levels["supports"], levels["resistances"],
+        vol_abnormal, price_down_today, fundamentals, price_target.get("upside_pct"),
+    )
+    direction = determine_direction(score["total"], short_score["total"])
+
+    short_conclusion = build_short_conclusion(short_score, trends, current_price, atr_value,
+                                               nearest_support, nearest_resistance)
+    short_strategies = build_short_strategies(current_price, atr_value, ma_last["ema20"], ma_last["ema50"],
+                                               nearest_support, nearest_resistance, rsi_value)
+
     # ---------- Estilo de trade sugerido ----------
     atr_pct = (atr_value / current_price * 100) if (atr_value and current_price) else None
     trade_style = classify_trade_style(atr_pct, adx_value, score["total"], score["breakdown"]["fundamentales"])
@@ -231,12 +246,16 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
         "price_target": price_target,
         "score": score,
         "signal": signal,
+        "short_score": short_score,
+        "direction": direction,
         "trends": trends,
         "alerts": alerts,
         "conclusion": conclusion,
+        "short_conclusion": short_conclusion,
         "trade_style": trade_style,
         "breakout": breakout,
         "strategies": strategies,
+        "short_strategies": short_strategies,
         "chart": {
             "candles": candles,
             "ema_overlays": ema_overlays,
