@@ -21,6 +21,7 @@
     <button class="tab-btn active" data-tab="analysis">Análisis</button>
     <button class="tab-btn" data-tab="compare">Comparar</button>
     <button class="tab-btn" data-tab="scanner">🔥 Explosivas</button>
+    <button class="tab-btn" data-tab="risk">📐 Riesgo</button>
     <button class="tab-btn" data-tab="portfolio">Portafolio</button>
   </div>
 
@@ -272,6 +273,49 @@
     <div id="scanner-loading" class="loader hidden"><div class="spinner"></div> Buscando configuraciones de ruptura...</div>
     <div id="scanner-error" class="error-banner hidden"></div>
     <div id="scanner-results" class="grid grid-2"></div>
+  </div>
+
+  <!-- ========================= TAB: RISK CALCULATOR ========================= -->
+  <div id="tab-risk" class="hidden">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">📐 Calculadora de riesgo y tamaño de posición</div>
+      <p class="stat-sub">Calculá cuántas acciones comprar según tu capital y el riesgo máximo que estás dispuesto a asumir en la operación. No sustituye tu propio juicio ni garantiza resultados.</p>
+      <button class="btn btn-ghost" id="risk-use-analysis-btn" style="margin-top:8px;">Usar precios del último análisis</button>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="card-title">Datos de la operación</div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <label class="stat-sub">Capital disponible ($)
+            <input type="number" id="risk-capital" class="risk-input" placeholder="10000" value="10000">
+          </label>
+          <label class="stat-sub">Riesgo máximo por operación (%)
+            <input type="number" id="risk-max-pct" class="risk-input" placeholder="1" value="1" step="0.1">
+          </label>
+          <label class="stat-sub">Precio de entrada ($)
+            <input type="number" id="risk-entry" class="risk-input" placeholder="150" step="any">
+          </label>
+          <label class="stat-sub">Stop loss ($)
+            <input type="number" id="risk-stop" class="risk-input" placeholder="145" step="any">
+          </label>
+          <label class="stat-sub">Objetivo de precio ($, opcional)
+            <input type="number" id="risk-target" class="risk-input" placeholder="165" step="any">
+          </label>
+          <label class="stat-sub">Comisión estimada por operación (%, opcional)
+            <input type="number" id="risk-commission" class="risk-input" placeholder="0.1" step="0.01" value="0">
+          </label>
+          <button class="btn btn-primary" id="risk-calc-btn">Calcular</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Resultado</div>
+        <div id="risk-results">
+          <div class="stat-sub">Completá los datos y presioná Calcular.</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ========================= TAB: PORTFOLIO ========================= -->

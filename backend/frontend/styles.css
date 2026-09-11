@@ -244,3 +244,14 @@ tr:last-child td{border-bottom:none;}
 .remove-btn:hover{color:var(--red);}
 
 .footer-note{color:var(--text-faint);font-size:11.5px;margin-top:40px;text-align:center;line-height:1.6;}
+
+.risk-input{
+  display:block;width:100%;margin-top:4px;
+  background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+  padding:9px 11px;border-radius:6px;font-family:var(--font-mono);font-size:14px;
+}
+.risk-result-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13.5px;}
+.risk-result-row:last-child{border-bottom:none;}
+.risk-result-row span:first-child{color:var(--text-dim);}
+.risk-result-row span:last-child{font-family:var(--font-mono);font-weight:600;}
+.risk-warning{background:rgba(240,180,41,.12);color:var(--amber);padding:10px 12px;border-radius:8px;font-size:13px;margin-top:10px;}

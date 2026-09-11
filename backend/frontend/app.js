@@ -59,7 +59,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['analysis', 'compare', 'scanner', 'portfolio'].forEach(tab => {
+    ['analysis', 'compare', 'scanner', 'risk', 'portfolio'].forEach(tab => {
       document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== btn.dataset.tab);
     });
   });
@@ -111,7 +111,10 @@ async function loadAnalysis(ticker, timeframe) {
   }
 }
 
+let lastAnalysisData = null;
+
 function renderAnalysis(d) {
+  lastAnalysisData = d;
   const currency = d.quote.currency || 'USD';
 
   // Header
@@ -454,6 +457,86 @@ document.getElementById('scanner-btn').addEventListener('click', async () => {
     document.getElementById('scanner-loading').classList.add('hidden');
   }
 });
+// ---------------------------------------------------------------------
+// Calculadora de riesgo y tamaño de posición
+// ---------------------------------------------------------------------
+document.getElementById('risk-use-analysis-btn').addEventListener('click', () => {
+  if (!lastAnalysisData) {
+    alert('Primero analizá un ticker en la pestaña "Análisis" para poder traer sus precios acá.');
+    return;
+  }
+  const d = lastAnalysisData;
+  const entry = d.conclusion.entry_range && d.conclusion.entry_range[0] != null ? d.conclusion.entry_range[0] : d.quote.price;
+  const stop = d.conclusion.stop_loss;
+  const target = d.conclusion.targets && d.conclusion.targets.length ? d.conclusion.targets[0] : null;
+  if (entry != null) document.getElementById('risk-entry').value = entry;
+  if (stop != null) document.getElementById('risk-stop').value = stop;
+  if (target != null) document.getElementById('risk-target').value = target;
+});
+
+document.getElementById('risk-calc-btn').addEventListener('click', () => {
+  const capital = parseFloat(document.getElementById('risk-capital').value) || 0;
+  const maxRiskPct = parseFloat(document.getElementById('risk-max-pct').value) || 0;
+  const entry = parseFloat(document.getElementById('risk-entry').value);
+  const stop = parseFloat(document.getElementById('risk-stop').value);
+  const target = parseFloat(document.getElementById('risk-target').value);
+  const commissionPct = parseFloat(document.getElementById('risk-commission').value) || 0;
+
+  const resultsEl = document.getElementById('risk-results');
+
+  if (!capital || !entry || !stop || entry === stop) {
+    resultsEl.innerHTML = '<div class="stat-sub">Completá al menos Capital, Precio de entrada y Stop loss (distintos entre sí).</div>';
+    return;
+  }
+  if (stop >= entry) {
+    resultsEl.innerHTML = '<div class="risk-warning">⚠️ El stop loss debería estar por debajo del precio de entrada para una posición larga (compra). Revisá los valores.</div>';
+    return;
+  }
+
+  const riskPerShare = entry - stop;
+  const maxRiskMoney = capital * (maxRiskPct / 100);
+  let shares = Math.floor(maxRiskMoney / riskPerShare);
+  if (shares < 0) shares = 0;
+
+  const positionValue = shares * entry;
+  const commission = positionValue * (commissionPct / 100) * 2; // entrada + salida
+  const maxLoss = shares * riskPerShare + commission;
+  const exposurePct = capital ? (positionValue / capital * 100) : 0;
+
+  let targetHtml = '';
+  if (target && target > entry) {
+    const potentialGain = shares * (target - entry) - commission;
+    const rr = (target - entry) / riskPerShare;
+    targetHtml = `
+      <div class="risk-result-row"><span>Ganancia potencial (al objetivo)</span><span style="color:var(--green)">${fmtMoney(potentialGain)}</span></div>
+      <div class="risk-result-row"><span>Relación riesgo/beneficio</span><span>1:${rr.toFixed(2)}</span></div>
+    `;
+  }
+
+  let warnings = '';
+  if (exposurePct > 25) {
+    warnings += `<div class="risk-warning">⚠️ Esta posición representa el ${exposurePct.toFixed(0)}% de tu capital — es una concentración alta para una sola operación.</div>`;
+  }
+  if (shares === 0) {
+    warnings += `<div class="risk-warning">⚠️ Con este riesgo máximo y esta distancia al stop, no alcanza ni para comprar 1 acción. Subí el riesgo permitido o achicá la distancia al stop.</div>`;
+  }
+  const stopDistancePct = (riskPerShare / entry) * 100;
+  if (stopDistancePct < 0.5) {
+    warnings += `<div class="risk-warning">⚠️ El stop está muy cerca del precio de entrada (${stopDistancePct.toFixed(2)}%) — hay riesgo de que te saque por simple ruido del mercado.</div>`;
+  }
+
+  resultsEl.innerHTML = `
+    <div class="risk-result-row"><span>Cantidad de acciones sugerida</span><span>${shares}</span></div>
+    <div class="risk-result-row"><span>Capital a utilizar</span><span>${fmtMoney(positionValue)}</span></div>
+    <div class="risk-result-row"><span>Exposición sobre tu capital</span><span>${exposurePct.toFixed(1)}%</span></div>
+    <div class="risk-result-row"><span>Riesgo por acción</span><span>${fmtMoney(riskPerShare)}</span></div>
+    <div class="risk-result-row"><span>Pérdida máxima estimada</span><span style="color:var(--red)">${fmtMoney(maxLoss)}</span></div>
+    <div class="risk-result-row"><span>% de tu capital en riesgo</span><span>${capital ? (maxLoss / capital * 100).toFixed(2) : '0'}%</span></div>
+    ${targetHtml}
+    ${warnings}
+  `;
+});
+
 function addPortfolioRow(ticker = '', quantity = '', avgPrice = '') {
   const div = document.createElement('div');
   div.className = 'input-row';
