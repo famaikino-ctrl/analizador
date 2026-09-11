@@ -149,6 +149,15 @@ function renderAnalysis(d) {
   scorePill.textContent = d.score.label;
   scorePill.className = 'pill ' + pillClass(d.score.color);
 
+  // Dirección sugerida (LONG / SHORT)
+  const dirEl = document.getElementById('direction-value');
+  const dir = d.direction.direction;
+  const dirIcon = dir === 'LONG' ? '🟢' : dir === 'SHORT' ? '🔴' : '🟡';
+  dirEl.textContent = `${dirIcon} ${dir}`;
+  dirEl.style.color = d.direction.color === 'green' ? 'var(--green)' : d.direction.color === 'red' ? 'var(--red)' : 'var(--amber)';
+  document.getElementById('score-long-mini').textContent = `${d.score.total} (${d.score.label})`;
+  document.getElementById('score-short-mini').textContent = `${d.short_score.total} (${d.short_score.label})`;
+
   // Señal
   const sigEl = document.getElementById('signal-value');
   sigEl.textContent = (d.signal.signal === 'COMPRA' ? '🟢 ' : d.signal.signal === 'ESPERAR' ? '🟡 ' : '🔴 ') + d.signal.signal;
@@ -196,12 +205,19 @@ function renderAnalysis(d) {
     document.getElementById('fib-table').innerHTML = '';
   }
 
-  // Conclusión
-  const c = d.conclusion;
-  document.getElementById('conclusion-signal').textContent =
-    (c.signal === 'COMPRA' ? '🟢 ' : c.signal === 'ESPERAR' ? '🟡 ' : '🔴 ') + c.signal;
-  document.getElementById('conclusion-signal').style.color = c.color === 'green' ? 'var(--green)' : c.color === 'red' ? 'var(--red)' : 'var(--amber)';
-  document.getElementById('conclusion-meta').innerHTML = `
+  // Conclusión — usa el lado LONG o SHORT según la dirección sugerida
+  const isShort = dir === 'SHORT';
+  const c = isShort ? d.short_conclusion : d.conclusion;
+  const conclusionLabel = isShort ? `🔴 SHORT (score ${d.short_score.total})` : (
+    (d.signal.signal === 'COMPRA' ? '🟢 ' : d.signal.signal === 'ESPERAR' ? '🟡 ' : '🔴 ') + d.signal.signal
+  );
+  document.getElementById('conclusion-signal').textContent = conclusionLabel;
+  document.getElementById('conclusion-signal').style.color = isShort ? 'var(--red)' : (d.signal.color === 'green' ? 'var(--green)' : d.signal.color === 'red' ? 'var(--red)' : 'var(--amber)');
+  document.getElementById('conclusion-meta').innerHTML = isShort ? `
+    <div>Tendencia: <b>${trends.medium_term.label}</b></div>
+    <div>Lado: <b>SHORT (venta en corto)</b></div>
+    <div>Riesgo: <b>${c.risk}</b></div>
+  ` : `
     <div>Tendencia: <b>${trends.medium_term.label}</b></div>
     <div>Fundamentales: <b>${c.fundamentals}</b></div>
     <div>Valuación: <b>${c.valuation}</b></div>
@@ -215,12 +231,13 @@ function renderAnalysis(d) {
   document.getElementById('risk-reward').textContent = c.risk_reward ? `1:${c.risk_reward}` : 'N/D';
   document.getElementById('invalidation-text').textContent = c.invalidation;
 
-  // Estrategias
+  // Estrategias — LONG o SHORT según la dirección
   const stratNames = { conservadora: 'Conservadora', moderada: 'Moderada', agresiva: 'Agresiva' };
-  document.getElementById('strategies-grid').innerHTML = Object.entries(d.strategies).map(([key, s]) => {
+  const stratSource = isShort ? d.short_strategies : d.strategies;
+  document.getElementById('strategies-grid').innerHTML = Object.entries(stratSource).map(([key, s]) => {
     if (!s) return `<div class="strategy-card"><h4>${stratNames[key]}</h4><p>Datos insuficientes para calcular esta estrategia.</p></div>`;
     return `<div class="strategy-card">
-      <h4>${stratNames[key]}</h4>
+      <h4>${stratNames[key]} ${isShort ? '(short)' : ''}</h4>
       <p>${s.descripcion}</p>
       <div class="strategy-row"><span>Entrada</span><span>${fmtMoney(s.entrada, currency)}</span></div>
       <div class="strategy-row"><span>Stop</span><span>${fmtMoney(s.stop, currency)}</span></div>
