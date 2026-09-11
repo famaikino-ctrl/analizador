@@ -59,9 +59,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['analysis', 'compare', 'scanner', 'risk', 'portfolio'].forEach(tab => {
+    ['analysis', 'compare', 'scanner', 'risk', 'history', 'portfolio'].forEach(tab => {
       document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== btn.dataset.tab);
     });
+    if (btn.dataset.tab === 'history') renderHistory();
   });
 });
 
@@ -313,7 +314,73 @@ function renderAnalysis(d) {
 
   // Gráfico
   renderChart(d);
+
+  // Guardar en el historial local (no consume cuota de la API)
+  saveToHistory(d);
 }
+
+// ---------------------------------------------------------------------
+// Historial de análisis y señales (guardado en localStorage del navegador)
+// ---------------------------------------------------------------------
+const HISTORY_KEY = 'stocklens_history_v1';
+const HISTORY_MAX_ENTRIES = 300;
+
+function saveToHistory(d) {
+  try {
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    history.unshift({
+      date: new Date().toISOString(),
+      ticker: d.ticker,
+      price: d.quote.price,
+      currency: d.quote.currency,
+      direction: d.direction.direction,
+      direction_color: d.direction.color,
+      score_long: d.score.total,
+      score_short: d.short_score.total,
+      signal: d.signal.signal,
+    });
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, HISTORY_MAX_ENTRIES)));
+  } catch (e) {
+    console.warn('No se pudo guardar en el historial local:', e);
+  }
+}
+
+function renderHistory() {
+  let history = [];
+  try {
+    history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  } catch (e) {
+    history = [];
+  }
+  const tbody = document.getElementById('history-table-body');
+  const emptyEl = document.getElementById('history-empty');
+  if (!history.length) {
+    tbody.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+  emptyEl.classList.add('hidden');
+  tbody.innerHTML = history.map(h => {
+    const dirColorVar = h.direction_color === 'green' ? 'var(--green)' : h.direction_color === 'red' ? 'var(--red)' : 'var(--amber)';
+    const dt = new Date(h.date);
+    return `<tr>
+      <td class="text-cell">${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+      <td class="text-cell">${h.ticker}</td>
+      <td>${fmtMoney(h.price, h.currency)}</td>
+      <td class="text-cell" style="color:${dirColorVar};font-weight:600;">${h.direction}</td>
+      <td>${h.score_long}</td>
+      <td>${h.score_short}</td>
+      <td class="text-cell">${h.signal}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('clear-history-btn').addEventListener('click', () => {
+  if (confirm('¿Seguro que querés borrar todo el historial guardado en este navegador?')) {
+    localStorage.removeItem(HISTORY_KEY);
+    renderHistory();
+  }
+});
 
 // ---------------------------------------------------------------------
 // Gráfico (lightweight-charts)

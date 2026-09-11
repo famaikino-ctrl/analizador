@@ -22,6 +22,7 @@
     <button class="tab-btn" data-tab="compare">Comparar</button>
     <button class="tab-btn" data-tab="scanner">🔥 Explosivas</button>
     <button class="tab-btn" data-tab="risk">📐 Riesgo</button>
+    <button class="tab-btn" data-tab="history">📜 Historial</button>
     <button class="tab-btn" data-tab="portfolio">Portafolio</button>
   </div>
 
@@ -327,6 +328,24 @@
           <div class="stat-sub">Completá los datos y presioná Calcular.</div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ========================= TAB: HISTORY ========================= -->
+  <div id="tab-history" class="hidden">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">📜 Historial de análisis y señales</div>
+      <p class="stat-sub">Cada vez que analizás un ticker, se guarda automáticamente acá (solo en este navegador) para que puedas revisar más adelante si la señal se cumplió o no. Útil para evaluar objetivamente el desempeño del sistema con el tiempo.</p>
+      <button class="btn btn-ghost" id="clear-history-btn" style="margin-top:8px;">Vaciar historial</button>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr>
+          <th>Fecha</th><th>Ticker</th><th>Precio</th><th>Dirección</th><th>Score LONG</th><th>Score SHORT</th><th>Señal</th>
+        </tr></thead>
+        <tbody id="history-table-body"></tbody>
+      </table>
+      <div id="history-empty" class="stat-sub" style="padding:16px 0;">Todavía no analizaste ningún ticker en este navegador.</div>
     </div>
   </div>
 
