@@ -19,6 +19,7 @@
 
   <div class="tabs">
     <button class="tab-btn active" data-tab="analysis">Análisis</button>
+    <button class="tab-btn" data-tab="market">🌍 Mercado</button>
     <button class="tab-btn" data-tab="compare">Comparar</button>
     <button class="tab-btn" data-tab="scanner">🔥 Explosivas</button>
     <button class="tab-btn" data-tab="risk">📐 Riesgo</button>
@@ -244,6 +245,24 @@
     </div>
   </div>
 
+  <!-- ========================= TAB: MARKET OVERVIEW ========================= -->
+  <div id="tab-market" class="hidden">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">🌍 Contexto general del mercado</div>
+      <p class="stat-sub">SPY (S&P 500), QQQ (Nasdaq 100), DIA (Dow Jones) y un proxy de volatilidad (VIXY). Usa 4 consultas de tu cuota diaria — actualizalo cuando lo necesites, no en cada visita.</p>
+      <button class="btn btn-primary" id="market-refresh-btn" style="margin-top:8px;">Actualizar panel de mercado</button>
+    </div>
+    <div id="market-loading" class="loader hidden"><div class="spinner"></div> Consultando el mercado general...</div>
+    <div id="market-error" class="error-banner hidden"></div>
+    <div id="market-content" class="hidden">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">Contexto general</div>
+        <div class="stat-value" id="market-context-value" style="font-size:26px;">—</div>
+      </div>
+      <div class="grid grid-4" id="market-cards"></div>
+    </div>
+  </div>
+
   <!-- ========================= TAB: COMPARE ========================= -->
   <div id="tab-compare" class="hidden">
     <div class="card" style="margin-bottom:18px;">
@@ -337,6 +356,19 @@
       <div class="card-title">📜 Historial de análisis y señales</div>
       <p class="stat-sub">Cada vez que analizás un ticker, se guarda automáticamente acá (solo en este navegador) para que puedas revisar más adelante si la señal se cumplió o no. Útil para evaluar objetivamente el desempeño del sistema con el tiempo.</p>
       <button class="btn btn-ghost" id="clear-history-btn" style="margin-top:8px;">Vaciar historial</button>
+    </div>
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">📨 Alertas automáticas por Telegram</div>
+      <p class="stat-sub">
+        Configurado desde las Variables de entorno de Railway (no desde acá): <span class="mono">TELEGRAM_BOT_TOKEN</span>,
+        <span class="mono">TELEGRAM_CHAT_ID</span>, <span class="mono">ALERT_TICKERS</span>, <span class="mono">ALERT_MIN_SCORE</span>,
+        <span class="mono">ALERT_CHECK_HOUR_UTC</span>. Corre 1 vez al día automáticamente. Usá los botones de abajo para probar sin esperar.
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <button class="btn btn-ghost" id="test-telegram-btn">Enviar mensaje de prueba</button>
+        <button class="btn btn-ghost" id="run-alerts-now-btn">Ejecutar chequeo ahora (consume cuota)</button>
+      </div>
+      <div id="telegram-test-result" class="stat-sub" style="margin-top:10px;"></div>
     </div>
     <div class="card">
       <table>

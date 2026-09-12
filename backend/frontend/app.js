@@ -59,7 +59,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['analysis', 'compare', 'scanner', 'risk', 'history', 'portfolio'].forEach(tab => {
+    ['analysis', 'market', 'compare', 'scanner', 'risk', 'history', 'portfolio'].forEach(tab => {
       document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== btn.dataset.tab);
     });
     if (btn.dataset.tab === 'history') renderHistory();
@@ -383,6 +383,40 @@ document.getElementById('clear-history-btn').addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------------
+// Alertas por Telegram (probar conexión / ejecutar chequeo manual)
+// ---------------------------------------------------------------------
+document.getElementById('test-telegram-btn').addEventListener('click', async () => {
+  const el = document.getElementById('telegram-test-result');
+  el.textContent = 'Enviando...';
+  try {
+    const res = await fetch(`${API_BASE}/api/alerts/test-telegram`, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'No se pudo enviar.');
+    el.textContent = '✅ Mensaje de prueba enviado. Revisá tu Telegram.';
+  } catch (err) {
+    el.textContent = '❌ ' + err.message;
+  }
+});
+
+document.getElementById('run-alerts-now-btn').addEventListener('click', async () => {
+  if (!confirm('Esto va a analizar todos los tickers de ALERT_TICKERS ahora mismo, consumiendo cuota de la API. ¿Continuar?')) return;
+  const el = document.getElementById('telegram-test-result');
+  el.textContent = 'Ejecutando chequeo... esto puede tardar varios minutos según cuántos tickers tengas configurados.';
+  try {
+    const res = await fetch(`${API_BASE}/api/alerts/run-now`, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'No se pudo ejecutar.');
+    el.innerHTML = `
+      <div>✅ Enviados: ${data.sent.join(', ') || 'ninguno'}</div>
+      <div>Sin señal clara u omitidos: ${data.skipped.join(', ') || 'ninguno'}</div>
+      ${data.errors.length ? `<div style="color:var(--red)">Errores: ${data.errors.join('; ')}</div>` : ''}
+    `;
+  } catch (err) {
+    el.textContent = '❌ ' + err.message;
+  }
+});
+
+// ---------------------------------------------------------------------
 // Gráfico (lightweight-charts)
 // ---------------------------------------------------------------------
 function applyChartTheme() {
@@ -461,8 +495,40 @@ function renderChart(d) {
 }
 
 // ---------------------------------------------------------------------
-// Comparar
+// Panel de mercado general
 // ---------------------------------------------------------------------
+document.getElementById('market-refresh-btn').addEventListener('click', async () => {
+  document.getElementById('market-error').classList.add('hidden');
+  document.getElementById('market-content').classList.add('hidden');
+  document.getElementById('market-loading').classList.remove('hidden');
+  try {
+    const res = await fetch(`${API_BASE}/api/market-overview`);
+    if (!res.ok) throw new Error('No se pudo obtener el panel de mercado.');
+    const data = await res.json();
+    const ctxEl = document.getElementById('market-context-value');
+    ctxEl.textContent = data.context.label;
+    ctxEl.style.color = data.context.color === 'green' ? 'var(--green)' : data.context.color === 'red' ? 'var(--red)' : 'var(--amber)';
+    document.getElementById('market-cards').innerHTML = data.symbols.map(s => {
+      if (s.error) {
+        return `<div class="card"><div class="card-title">${s.label}</div><div class="stat-sub">${s.error}</div></div>`;
+      }
+      const color = (s.change_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+      return `<div class="card">
+        <div class="card-title">${s.label}</div>
+        <div class="stat-value mono">${fmtMoney(s.price)}</div>
+        <div class="stat-sub" style="color:${color}">${fmtPct(s.change_pct)}</div>
+        <div class="stat-sub">Rango: ${fmtMoney(s.day_low)} - ${fmtMoney(s.day_high)}</div>
+        <div class="stat-sub">Al ${s.as_of_date}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('market-content').classList.remove('hidden');
+  } catch (err) {
+    document.getElementById('market-error').textContent = err.message;
+    document.getElementById('market-error').classList.remove('hidden');
+  } finally {
+    document.getElementById('market-loading').classList.add('hidden');
+  }
+});
 document.getElementById('compare-btn').addEventListener('click', async () => {
   const raw = document.getElementById('compare-input').value.trim();
   if (!raw) return;
