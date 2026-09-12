@@ -5,9 +5,14 @@ from fastapi.responses import FileResponse, JSONResponse
 from pathlib import Path
 from typing import List
 import math
+import os
+import asyncio
+from datetime import datetime, timezone
 
 from services.data_provider import YFinanceProvider, AlphaVantageProvider
 from analysis import analyze_ticker
+from notifications import run_daily_alert_check, send_telegram_message
+from market_overview import get_market_snapshot
 
 app = FastAPI(title="Stock Analyzer API")
 
@@ -33,6 +38,56 @@ app.add_middleware(
 # --------------------------------------------------------------------------
 provider = AlphaVantageProvider()
 
+# --------------------------------------------------------------------------
+# Alertas automaticas por Telegram (chequeo diario, ver notifications.py
+# para la explicacion completa de por que es 1 vez por dia y no en vivo).
+# --------------------------------------------------------------------------
+_last_daily_check_date = None
+
+
+async def _alert_scheduler_loop():
+    global _last_daily_check_date
+    check_hour = int(os.environ.get("ALERT_CHECK_HOUR_UTC", "14"))
+    while True:
+        now = datetime.now(timezone.utc)
+        today_str = now.strftime("%Y-%m-%d")
+        if now.hour == check_hour and _last_daily_check_date != today_str:
+            if os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("ALERT_TICKERS"):
+                try:
+                    run_daily_alert_check(provider)
+                except Exception:
+                    pass
+            _last_daily_check_date = today_str
+        await asyncio.sleep(60 * 30)  # revisa cada 30 min si ya es la hora configurada
+
+
+@app.on_event("startup")
+async def _start_alert_scheduler():
+    asyncio.create_task(_alert_scheduler_loop())
+
+
+@app.post("/api/alerts/test-telegram")
+def api_test_telegram():
+    """Envia un mensaje de prueba para confirmar que el bot esta bien configurado."""
+    ok = send_telegram_message("✅ StockLens conectado correctamente. Las alertas diarias van a llegar por acá.")
+    if not ok:
+        raise HTTPException(status_code=400, detail="No se pudo enviar. Revisá TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID en las variables de entorno.")
+    return {"status": "enviado"}
+
+
+@app.post("/api/alerts/run-now")
+def api_run_alerts_now():
+    """Corre el chequeo de la lista de seguimiento manualmente (ademas del
+    chequeo automatico diario). Util para probar sin esperar a la hora
+    configurada. OJO: consume cuota de la API de datos (2 llamados por
+    ticker en ALERT_TICKERS)."""
+    if not os.environ.get("ALERT_TICKERS"):
+        raise HTTPException(status_code=400, detail="No configuraste ALERT_TICKERS todavia.")
+    result = run_daily_alert_check(provider)
+    return JSONResponse(content=result)
+
+
+
 
 def _sanitize(obj):
     """Convierte NaN/Infinity (no válidos en JSON estándar) a None de forma
@@ -46,6 +101,15 @@ def _sanitize(obj):
             return None
         return obj
     return obj
+
+
+@app.get("/api/market-overview")
+def api_market_overview():
+    """Contexto general del mercado (SPY/QQQ/DIA + proxy de volatilidad).
+    Usa 1 sola llamada a la API por simbolo (4 en total), no consultes esto
+    mas de un par de veces por dia para no gastar la cuota gratuita."""
+    result = get_market_snapshot(provider)
+    return JSONResponse(content=_sanitize(result))
 
 
 @app.get("/api/analyze/{ticker}")
