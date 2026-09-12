@@ -24,6 +24,7 @@
     <button class="tab-btn" data-tab="scanner">🔥 Explosivas</button>
     <button class="tab-btn" data-tab="risk">📐 Riesgo</button>
     <button class="tab-btn" data-tab="history">📜 Historial</button>
+    <button class="tab-btn" data-tab="backtest">⏮️ Backtest</button>
     <button class="tab-btn" data-tab="portfolio">Portafolio</button>
   </div>
 
@@ -217,6 +218,18 @@
         <div class="card"><div class="card-title">Volumen vs Promedio 20d</div><div class="stat-value mono" id="ind-vol" style="font-size:16px;">—</div></div>
         <div class="card"><div class="card-title">VWAP (60d acumulado)</div><div class="stat-value mono" id="ind-vwap">—</div></div>
       </div>
+      <div class="grid grid-4" style="margin-top:16px;">
+        <div class="card"><div class="card-title">OBV (On Balance Volume)</div><div class="stat-value" id="ind-obv" style="font-size:18px;">—</div></div>
+        <div class="card"><div class="card-title">ROC / Momentum (10)</div><div class="stat-value mono" id="ind-roc" style="font-size:16px;">—</div></div>
+        <div class="card"><div class="card-title">Volumen relativo</div><div class="stat-value mono" id="ind-relvol" style="font-size:20px;">—</div></div>
+        <div class="card"><div class="card-title">Divergencias</div><div class="stat-value" id="ind-divergence" style="font-size:14px;">—</div></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">Pivot Points clásicos (sesión anterior)</div>
+        <table><thead><tr><th>S3</th><th>S2</th><th>S1</th><th>PP</th><th>R1</th><th>R2</th><th>R3</th></tr></thead>
+        <tbody><tr id="pivots-row"></tr></tbody></table>
+      </div>
 
       <div class="card" style="margin-top:16px;">
         <div class="card-title">Medias móviles</div>
@@ -378,6 +391,47 @@
         <tbody id="history-table-body"></tbody>
       </table>
       <div id="history-empty" class="stat-sub" style="padding:16px 0;">Todavía no analizaste ningún ticker en este navegador.</div>
+    </div>
+  </div>
+
+  <!-- ========================= TAB: BACKTEST ========================= -->
+  <div id="tab-backtest" class="hidden">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">⏮️ Backtesting simple</div>
+      <p class="stat-sub">
+        Simula qué hubiera pasado si hubieras entrado cada vez que un score técnico simplificado
+        (sin fundamentales, porque no hay historial de esos datos) superó un umbral, con stop y objetivo basados en ATR.
+        Usa solo el historial disponible (~5 meses con el plan gratuito) — es una <b>muestra chica</b>, sirve como
+        demostración metodológica, no como prueba estadística sólida. No incluye comisiones ni slippage por defecto.
+        Rendimiento pasado no garantiza resultados futuros.
+      </p>
+      <div class="input-row" style="margin-top:10px;flex-wrap:wrap;">
+        <input type="text" id="backtest-ticker" placeholder="TICKER" style="width:110px;text-transform:uppercase;">
+        <input type="number" id="backtest-threshold" placeholder="Score mínimo" value="65" style="width:130px;">
+        <input type="number" id="backtest-holding" placeholder="Días máx." value="20" style="width:110px;">
+        <button class="btn btn-primary" id="backtest-run-btn">Ejecutar backtest</button>
+      </div>
+    </div>
+    <div id="backtest-loading" class="loader hidden"><div class="spinner"></div> Simulando operaciones históricas...</div>
+    <div id="backtest-error" class="error-banner hidden"></div>
+    <div id="backtest-content" class="hidden">
+      <div class="grid grid-4" style="margin-bottom:16px;">
+        <div class="card"><div class="card-title">Operaciones</div><div class="stat-value mono" id="bt-num-trades">—</div></div>
+        <div class="card"><div class="card-title">Win rate</div><div class="stat-value mono" id="bt-winrate">—</div></div>
+        <div class="card"><div class="card-title">Retorno promedio</div><div class="stat-value mono" id="bt-avgreturn">—</div></div>
+        <div class="card"><div class="card-title">Retorno total acumulado</div><div class="stat-value mono" id="bt-totalreturn">—</div></div>
+      </div>
+      <div class="grid grid-3" style="margin-bottom:16px;">
+        <div class="card"><div class="card-title">Profit factor</div><div class="stat-value mono" id="bt-pf">—</div></div>
+        <div class="card"><div class="card-title">Máximo drawdown</div><div class="stat-value mono" id="bt-drawdown">—</div></div>
+        <div class="card"><div class="card-title">Muestra</div><div class="stat-value mono" id="bt-sample">—</div></div>
+      </div>
+      <div id="bt-note" class="error-banner" style="background:rgba(240,180,41,.1);border-color:rgba(240,180,41,.3);color:var(--amber);"></div>
+      <div class="card">
+        <div class="card-title">Detalle de operaciones simuladas</div>
+        <table><thead><tr><th>Entrada</th><th>Salida</th><th>Precio entrada</th><th>Precio salida</th><th>Retorno</th><th>Días</th><th>Resultado</th></tr></thead>
+        <tbody id="bt-trades-body"></tbody></table>
+      </div>
     </div>
   </div>
 

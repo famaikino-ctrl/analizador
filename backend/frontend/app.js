@@ -59,7 +59,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['analysis', 'market', 'compare', 'scanner', 'risk', 'history', 'portfolio'].forEach(tab => {
+    ['analysis', 'market', 'compare', 'scanner', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
       document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== btn.dataset.tab);
     });
     if (btn.dataset.tab === 'history') renderHistory();
@@ -265,6 +265,28 @@ function renderAnalysis(d) {
   document.getElementById('ind-vol').textContent =
     `${fmtBig(d.volume.current)} vs ${fmtBig(d.volume.average_20d)} ${d.volume.abnormal ? '🚨 anormal' : ''}`;
   document.getElementById('ind-vwap').textContent = fmtMoney(d.volume.vwap_60d, currency);
+
+  // OBV, ROC/Momentum, Volumen relativo, Divergencias
+  const obvLabels = { confirma_alcista: '📈 Confirma tendencia alcista', confirma_bajista: '📉 Confirma tendencia bajista', plano: 'Plano', 'N/D': 'N/D' };
+  document.getElementById('ind-obv').textContent = obvLabels[d.volume.obv_trend] || d.volume.obv_trend;
+  document.getElementById('ind-roc').textContent = `ROC: ${fmtPct(d.momentum_extra.roc_10)} · Mom: ${fmtNum(d.momentum_extra.momentum_10)}`;
+  document.getElementById('ind-relvol').textContent = d.volume.relative_volume != null ? `${d.volume.relative_volume.toFixed(2)}x` : 'N/D';
+
+  const divLabels = {
+    divergencia_alcista: '🟢 Divergencia alcista', divergencia_bajista: '🔴 Divergencia bajista',
+    sin_divergencia_clara: 'Sin divergencia clara', sin_datos_suficientes: 'N/D',
+  };
+  document.getElementById('ind-divergence').innerHTML =
+    `MACD: ${divLabels[d.oscillators.macd_divergence] || d.oscillators.macd_divergence}<br>RSI: ${divLabels[d.oscillators.rsi_divergence] || d.oscillators.rsi_divergence}`;
+
+  // Pivot Points
+  if (d.pivot_points) {
+    const pv = d.pivot_points;
+    document.getElementById('pivots-row').innerHTML =
+      [pv.s3, pv.s2, pv.s1, pv.pp, pv.r1, pv.r2, pv.r3].map(v => `<td>${fmtMoney(v, currency)}</td>`).join('');
+  } else {
+    document.getElementById('pivots-row').innerHTML = '<td colspan="7" class="text-cell">N/D</td>';
+  }
 
   document.getElementById('ma-row').innerHTML = ['ema9', 'ema20', 'ema50', 'ema100', 'ema200', 'sma20', 'sma50', 'sma200']
     .map(k => `<td>${fmtMoney(d.moving_averages[k], currency)}</td>`).join('');
@@ -608,8 +630,80 @@ document.getElementById('scanner-btn').addEventListener('click', async () => {
   }
 });
 // ---------------------------------------------------------------------
-// Calculadora de riesgo y tamaño de posición
+// Backtesting simple
 // ---------------------------------------------------------------------
+document.getElementById('backtest-run-btn').addEventListener('click', async () => {
+  const ticker = document.getElementById('backtest-ticker').value.trim().toUpperCase();
+  const threshold = parseFloat(document.getElementById('backtest-threshold').value) || 65;
+  const holding = parseInt(document.getElementById('backtest-holding').value) || 20;
+  if (!ticker) return;
+
+  document.getElementById('backtest-error').classList.add('hidden');
+  document.getElementById('backtest-content').classList.add('hidden');
+  document.getElementById('backtest-loading').classList.remove('hidden');
+
+  try {
+    const res = await fetch(`${API_BASE}/api/backtest/${encodeURIComponent(ticker)}?entry_threshold=${threshold}&max_holding_days=${holding}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Error desconocido' }));
+      throw new Error(err.detail || 'No se pudo ejecutar el backtest.');
+    }
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    if (!data.num_trades) {
+      document.getElementById('bt-num-trades').textContent = '0';
+      document.getElementById('bt-winrate').textContent = 'N/D';
+      document.getElementById('bt-avgreturn').textContent = 'N/D';
+      document.getElementById('bt-totalreturn').textContent = 'N/D';
+      document.getElementById('bt-pf').textContent = 'N/D';
+      document.getElementById('bt-drawdown').textContent = 'N/D';
+      document.getElementById('bt-sample').textContent = `${data.sample_size_days || '—'} velas`;
+      document.getElementById('bt-note').textContent = data.note || 'No se generaron operaciones en el período disponible.';
+      document.getElementById('bt-note').classList.remove('hidden');
+      document.getElementById('bt-trades-body').innerHTML = '';
+      document.getElementById('backtest-content').classList.remove('hidden');
+      return;
+    }
+
+    document.getElementById('bt-num-trades').textContent = data.num_trades;
+    document.getElementById('bt-winrate').textContent = data.win_rate_pct + '%';
+    document.getElementById('bt-avgreturn').textContent = fmtPct(data.avg_return_pct);
+    document.getElementById('bt-avgreturn').style.color = data.avg_return_pct >= 0 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('bt-totalreturn').textContent = fmtPct(data.total_return_pct);
+    document.getElementById('bt-totalreturn').style.color = data.total_return_pct >= 0 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('bt-pf').textContent = data.profit_factor != null ? data.profit_factor : 'N/D';
+    document.getElementById('bt-drawdown').textContent = fmtPct(data.max_drawdown_pct);
+    document.getElementById('bt-sample').textContent = `${data.sample_size_days} velas`;
+
+    if (data.note) {
+      document.getElementById('bt-note').textContent = '⚠️ ' + data.note;
+      document.getElementById('bt-note').classList.remove('hidden');
+    } else {
+      document.getElementById('bt-note').classList.add('hidden');
+    }
+
+    document.getElementById('bt-trades-body').innerHTML = data.trades.map(t => `
+      <tr>
+        <td class="text-cell">${t.entry_date}</td>
+        <td class="text-cell">${t.exit_date}</td>
+        <td>${fmtMoney(t.entry_price)}</td>
+        <td>${fmtMoney(t.exit_price)}</td>
+        <td style="color:${t.return_pct >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtPct(t.return_pct)}</td>
+        <td>${t.days_held}</td>
+        <td class="text-cell">${t.outcome}</td>
+      </tr>
+    `).join('');
+
+    document.getElementById('backtest-content').classList.remove('hidden');
+  } catch (err) {
+    document.getElementById('backtest-error').textContent = err.message;
+    document.getElementById('backtest-error').classList.remove('hidden');
+  } finally {
+    document.getElementById('backtest-loading').classList.add('hidden');
+  }
+});
 document.getElementById('risk-use-analysis-btn').addEventListener('click', () => {
   if (!lastAnalysisData) {
     alert('Primero analizá un ticker en la pestaña "Análisis" para poder traer sus precios acá.');
