@@ -13,6 +13,7 @@ from services.data_provider import YFinanceProvider, AlphaVantageProvider
 from analysis import analyze_ticker
 from notifications import run_daily_alert_check, send_telegram_message
 from market_overview import get_market_snapshot
+from backtest import run_backtest
 
 app = FastAPI(title="Stock Analyzer API")
 
@@ -109,6 +110,22 @@ def api_market_overview():
     Usa 1 sola llamada a la API por simbolo (4 en total), no consultes esto
     mas de un par de veces por dia para no gastar la cuota gratuita."""
     result = get_market_snapshot(provider)
+    return JSONResponse(content=_sanitize(result))
+
+
+@app.get("/api/backtest/{ticker}")
+def api_backtest(ticker: str, entry_threshold: float = 65, max_holding_days: int = 20):
+    """Backtest tecnico simplificado sobre el historial disponible (~100
+    dias en el plan gratuito). Usa 1 sola llamada a la API (solo precio,
+    no hace falta OVERVIEW para esto)."""
+    try:
+        df = provider.get_price_history(ticker, period="1y", interval="1d")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo datos de {ticker}: {exc}")
+    if df.empty:
+        raise HTTPException(status_code=404, detail=f"No se encontraron datos para el ticker '{ticker}'.")
+
+    result = run_backtest(df, entry_threshold=entry_threshold, max_holding_days=max_holding_days)
     return JSONResponse(content=_sanitize(result))
 
 

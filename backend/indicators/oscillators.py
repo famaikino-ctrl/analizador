@@ -56,37 +56,48 @@ def macd_state(macd_line: pd.Series, signal_line: pd.Series, hist: pd.Series) ->
     return {"cross": cross, "histogram": histogram}
 
 
-def detect_macd_divergence(close: pd.Series, macd_line: pd.Series, lookback: int = 30) -> str:
-    """Heurística simple: compara los dos últimos mínimos/máximos de precio
-    contra los del MACD en la ventana `lookback` para detectar divergencia.
-    Es una aproximación, no un detector de patrones certero."""
+def _local_extrema(series, kind="min", window=2):
+    idxs = []
+    for i in range(window, len(series) - window):
+        seg = series.iloc[i - window:i + window + 1]
+        if kind == "min" and series.iloc[i] == seg.min():
+            idxs.append(i)
+        if kind == "max" and series.iloc[i] == seg.max():
+            idxs.append(i)
+    return idxs
+
+
+def _detect_divergence(close: pd.Series, indicator: pd.Series, lookback: int = 30, window: int = 2) -> str:
+    """Heuristica generica de divergencia precio vs. indicador (sirve para
+    MACD o RSI): compara los dos ultimos minimos/maximos locales del precio
+    contra los del indicador en la ventana `lookback`. Es una aproximacion
+    estadistica, no un detector de patrones certero -- puede dar falsos
+    positivos/negativos, especialmente con series cortas."""
     c = close.tail(lookback).reset_index(drop=True)
-    m = macd_line.tail(lookback).reset_index(drop=True)
-    if len(c) < 10 or m.isna().all():
+    ind = indicator.tail(lookback).reset_index(drop=True)
+    if len(c) < 10 or ind.isna().all():
         return "sin_datos_suficientes"
 
-    def local_extrema(series, kind="min"):
-        idxs = []
-        for i in range(2, len(series) - 2):
-            window = series.iloc[i - 2:i + 3]
-            if kind == "min" and series.iloc[i] == window.min():
-                idxs.append(i)
-            if kind == "max" and series.iloc[i] == window.max():
-                idxs.append(i)
-        return idxs
-
-    lows = local_extrema(c, "min")
-    highs = local_extrema(c, "max")
+    lows = _local_extrema(c, "min", window)
+    highs = _local_extrema(c, "max", window)
 
     if len(lows) >= 2:
         i1, i2 = lows[-2], lows[-1]
-        if c.iloc[i2] < c.iloc[i1] and m.iloc[i2] > m.iloc[i1]:
+        if c.iloc[i2] < c.iloc[i1] and ind.iloc[i2] > ind.iloc[i1]:
             return "divergencia_alcista"
     if len(highs) >= 2:
         i1, i2 = highs[-2], highs[-1]
-        if c.iloc[i2] > c.iloc[i1] and m.iloc[i2] < m.iloc[i1]:
+        if c.iloc[i2] > c.iloc[i1] and ind.iloc[i2] < ind.iloc[i1]:
             return "divergencia_bajista"
     return "sin_divergencia_clara"
+
+
+def detect_macd_divergence(close: pd.Series, macd_line: pd.Series, lookback: int = 30) -> str:
+    return _detect_divergence(close, macd_line, lookback)
+
+
+def detect_rsi_divergence(close: pd.Series, rsi_series: pd.Series, lookback: int = 30) -> str:
+    return _detect_divergence(close, rsi_series, lookback)
 
 
 def stochastic_rsi(close: pd.Series, rsi_length: int = 14, stoch_length: int = 14,

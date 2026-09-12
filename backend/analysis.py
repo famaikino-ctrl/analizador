@@ -3,9 +3,10 @@ import pandas as pd
 
 from services.data_provider import DataProvider
 from indicators.moving_averages import compute_all_mas, last_valid, detect_cross
-from indicators.oscillators import rsi, interpret_rsi, macd, macd_state, detect_macd_divergence, stochastic_rsi
+from indicators.oscillators import rsi, interpret_rsi, macd, macd_state, detect_macd_divergence, detect_rsi_divergence, stochastic_rsi
 from indicators.volatility import atr, adx, interpret_adx, bollinger_bands
 from indicators.volume import average_volume, is_abnormal_volume, vwap
+from indicators.extra import obv, obv_trend, roc, momentum, relative_volume, classic_pivot_points
 from levels.support_resistance import detect_levels
 from levels.fibonacci import compute_fibonacci, match_fib_with_levels
 from valuation.price_target import compute_price_target
@@ -94,6 +95,7 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
     macd_line, signal_line, hist = macd(close)
     macd_info = macd_state(macd_line, signal_line, hist)
     macd_divergence = detect_macd_divergence(close, macd_line)
+    rsi_divergence = detect_rsi_divergence(close, rsi_series)
 
     k, d = stochastic_rsi(close)
     stoch_k, stoch_d = last_valid(k), last_valid(d)
@@ -115,6 +117,19 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
     price_up_today = quote.get("change_pct") is not None and quote["change_pct"] > 0
     vwap_series = vwap(df_calc.tail(60))
     vwap_value = last_valid(vwap_series)
+
+    # ---------- Indicadores adicionales: OBV, ROC, Momentum, Vol. relativo ----------
+    obv_series = obv(close, df_calc["Volume"])
+    obv_trend_value = obv_trend(obv_series)
+    roc_value = last_valid(roc(close, 10))
+    momentum_value = last_valid(momentum(close, 10))
+    rel_volume_value = relative_volume(df_calc["Volume"], 20)
+
+    # ---------- Pivot Points clasicos (sobre la sesion anterior) ----------
+    pivots = None
+    if len(df_calc) >= 2:
+        prev_row = df_calc.iloc[-2]
+        pivots = classic_pivot_points(float(prev_row["High"]), float(prev_row["Low"]), float(prev_row["Close"]))
 
     # ---------- Soportes / Resistencias ----------
     levels = detect_levels(df_calc, current_price, quote.get("week52_high"), quote.get("week52_low"))
@@ -222,6 +237,7 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
             "macd_histogram": _clean(last_valid(hist)),
             "macd_state": macd_info,
             "macd_divergence": macd_divergence,
+            "rsi_divergence": rsi_divergence,
             "stochastic_rsi_k": _clean(stoch_k),
             "stochastic_rsi_d": _clean(stoch_d),
         },
@@ -238,7 +254,14 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
             "average_20d": _clean(vol_avg),
             "abnormal": vol_abnormal,
             "vwap_60d": _clean(vwap_value),
+            "obv_trend": obv_trend_value,
+            "relative_volume": _clean(rel_volume_value),
         },
+        "momentum_extra": {
+            "roc_10": _clean(roc_value),
+            "momentum_10": _clean(momentum_value),
+        },
+        "pivot_points": pivots,
         "levels": levels,
         "fibonacci": fib,
         "fundamentals": {k: _clean(v) for k, v in fundamentals.items()},
