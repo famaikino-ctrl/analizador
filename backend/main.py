@@ -113,6 +113,19 @@ def api_market_overview():
     return JSONResponse(content=_sanitize(result))
 
 
+@app.get("/api/news/{ticker}")
+def api_news(ticker: str):
+    """Noticias recientes con sentimiento. Consume 1 consulta extra de la
+    cuota diaria; por eso es manual (bajo pedido), no automatico."""
+    if not hasattr(provider, "get_news"):
+        raise HTTPException(status_code=501, detail="El proveedor de datos actual no soporta noticias.")
+    try:
+        result = provider.get_news(ticker)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo noticias de {ticker}: {exc}")
+    return JSONResponse(content=_sanitize(result))
+
+
 @app.get("/api/backtest/{ticker}")
 def api_backtest(ticker: str, entry_threshold: float = 65, max_holding_days: int = 20):
     """Backtest tecnico simplificado sobre el historial disponible (~100

@@ -430,3 +430,40 @@ class AlphaVantageProvider(DataProvider):
         if mean is None:
             return None
         return {"low": None, "mean": mean, "high": None, "num_analysts": None}
+
+    def get_news(self, ticker: str, limit: int = 8) -> dict:
+        """Noticias recientes con sentimiento, via el endpoint NEWS_SENTIMENT
+        de Alpha Vantage. No siempre esta disponible en todas las cuentas
+        gratuitas (puede depender de cambios en la politica del proveedor);
+        si falla, se devuelve una lista vacia con una nota explicativa en
+        vez de inventar noticias."""
+        data = self._request({"function": "NEWS_SENTIMENT", "tickers": ticker.upper(), "limit": str(limit)})
+        feed = data.get("feed")
+        if not feed:
+            return {"articles": [], "note": "No hay noticias disponibles para este ticker en este momento (o el endpoint de noticias no esta habilitado en tu cuenta)."}
+
+        articles = []
+        for item in feed[:limit]:
+            ticker_sentiment = None
+            for ts in item.get("ticker_sentiment", []):
+                if ts.get("ticker", "").upper() == ticker.upper():
+                    ticker_sentiment = ts
+                    break
+            label = (ticker_sentiment or {}).get("ticker_sentiment_label") or item.get("overall_sentiment_label")
+            score = _av_num((ticker_sentiment or {}).get("ticker_sentiment_score")) or _av_num(item.get("overall_sentiment_score"))
+            time_published = item.get("time_published", "")
+            formatted_date = None
+            if len(time_published) >= 8:
+                try:
+                    formatted_date = f"{time_published[0:4]}-{time_published[4:6]}-{time_published[6:8]}"
+                except Exception:
+                    formatted_date = None
+            articles.append({
+                "title": item.get("title"),
+                "url": item.get("url"),
+                "source": item.get("source"),
+                "date": formatted_date,
+                "sentiment_label": label,
+                "sentiment_score": score,
+            })
+        return {"articles": articles, "note": None}
