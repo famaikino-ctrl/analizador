@@ -517,8 +517,47 @@ function renderChart(d) {
 }
 
 // ---------------------------------------------------------------------
-// Panel de mercado general
+// Noticias recientes con sentimiento
 // ---------------------------------------------------------------------
+document.getElementById('load-news-btn').addEventListener('click', async () => {
+  if (!currentTicker) return;
+  document.getElementById('news-error').classList.add('hidden');
+  document.getElementById('news-list').innerHTML = '';
+  document.getElementById('news-loading').classList.remove('hidden');
+  try {
+    const res = await fetch(`${API_BASE}/api/news/${encodeURIComponent(currentTicker)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'No se pudieron obtener las noticias.' }));
+      throw new Error(err.detail);
+    }
+    const data = await res.json();
+    if (!data.articles.length) {
+      document.getElementById('news-list').innerHTML = `<div class="stat-sub">${data.note || 'No hay noticias disponibles.'}</div>`;
+      return;
+    }
+    const sentimentPill = (label) => {
+      if (!label) return 'pill-gray';
+      const l = label.toLowerCase();
+      if (l.includes('bullish')) return 'pill-green';
+      if (l.includes('bearish')) return 'pill-red';
+      return 'pill-yellow';
+    };
+    document.getElementById('news-list').innerHTML = data.articles.map(a => `
+      <div class="alert-item" style="flex-direction:column;align-items:flex-start;gap:4px;">
+        <div style="display:flex;justify-content:space-between;width:100%;gap:10px;">
+          <a href="${a.url}" target="_blank" rel="noopener" style="color:var(--text);font-weight:600;font-size:13.5px;text-decoration:none;">${a.title}</a>
+          <span class="pill ${sentimentPill(a.sentiment_label)}" style="white-space:nowrap;">${a.sentiment_label || 'N/D'}</span>
+        </div>
+        <div class="stat-sub">${a.source || 'Fuente desconocida'} · ${a.date || ''}</div>
+      </div>
+    `).join('');
+  } catch (err) {
+    document.getElementById('news-error').textContent = err.message;
+    document.getElementById('news-error').classList.remove('hidden');
+  } finally {
+    document.getElementById('news-loading').classList.add('hidden');
+  }
+});
 document.getElementById('market-refresh-btn').addEventListener('click', async () => {
   document.getElementById('market-error').classList.add('hidden');
   document.getElementById('market-content').classList.add('hidden');
