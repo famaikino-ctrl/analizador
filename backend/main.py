@@ -139,6 +139,16 @@ def api_backtest(ticker: str, entry_threshold: float = 65, max_holding_days: int
         raise HTTPException(status_code=404, detail=f"No se encontraron datos para el ticker '{ticker}'.")
 
     result = run_backtest(df, entry_threshold=entry_threshold, max_holding_days=max_holding_days)
+
+    candles = [
+        {
+            "time": idx.strftime("%Y-%m-%d"),
+            "open": float(row["Open"]), "high": float(row["High"]),
+            "low": float(row["Low"]), "close": float(row["Close"]),
+        }
+        for idx, row in df.iterrows()
+    ]
+    result["candles"] = candles
     return JSONResponse(content=_sanitize(result))
 
 

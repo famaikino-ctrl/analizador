@@ -1,7 +1,7 @@
 import math
 import pandas as pd
 
-from services.data_provider import DataProvider
+from services.data_provider import DataProvider, get_us_market_status
 from indicators.moving_averages import compute_all_mas, last_valid, detect_cross
 from indicators.oscillators import rsi, interpret_rsi, macd, macd_state, detect_macd_divergence, detect_rsi_divergence, stochastic_rsi
 from indicators.volatility import atr, adx, interpret_adx, bollinger_bands
@@ -222,10 +222,11 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
         "company": company,
         "quote": {k: _clean(v) for k, v in quote.items() if k != "as_of"} | {"as_of": quote.get("as_of")},
         "data_freshness": {
-            "precio": "tiempo real / con posible retraso de 15 min (Yahoo Finance)",
+            "precio": "cierre de la sesion mas reciente (puede tener demora segun el proveedor de datos)",
             "fundamentales": "datos trimestrales/anuales mas recientes reportados",
             "actualizado": quote.get("as_of"),
         },
+        "market_status": get_us_market_status(),
         "moving_averages": {k: _clean(v) for k, v in ma_last.items()},
         "ema_flags": ema_flags,
         "crosses": {"ema9_20": cross_9_20, "ema20_50": cross_20_50, "ema50_200": cross_50_200},

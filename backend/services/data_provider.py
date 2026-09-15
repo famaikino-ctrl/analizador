@@ -12,10 +12,42 @@ archivos cuando cambie el proveedor de datos.
 """
 
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timezone, time as dtime
+import zoneinfo
 from typing import Optional
 import pandas as pd
 import yfinance as yf
+
+
+def get_us_market_status() -> dict:
+    """Estado aproximado del mercado de EE.UU. (NYSE/Nasdaq) segun el
+    horario de Nueva York. LIMITACION: no tiene en cuenta feriados
+    bursatiles (Thanksgiving, Navidad, etc.), solo dias de semana y
+    horario. Por eso puede decir "abierto" en un feriado -- es una
+    aproximacion, no una fuente oficial del estado del mercado."""
+    ny_tz = zoneinfo.ZoneInfo("America/New_York")
+    now_ny = datetime.now(ny_tz)
+    weekday = now_ny.weekday()  # 0=lunes ... 6=domingo
+    current_time = now_ny.time()
+
+    if weekday >= 5:
+        return {"status": "cerrado", "label": "Mercado cerrado (fin de semana)", "ny_time": now_ny.strftime("%Y-%m-%d %H:%M")}
+
+    pre_market_start = dtime(4, 0)
+    market_open = dtime(9, 30)
+    market_close = dtime(16, 0)
+    after_hours_end = dtime(20, 0)
+
+    if pre_market_start <= current_time < market_open:
+        status, label = "pre_market", "Pre-market"
+    elif market_open <= current_time < market_close:
+        status, label = "abierto", "Mercado abierto"
+    elif market_close <= current_time < after_hours_end:
+        status, label = "after_hours", "After-hours"
+    else:
+        status, label = "cerrado", "Mercado cerrado"
+
+    return {"status": status, "label": label, "ny_time": now_ny.strftime("%Y-%m-%d %H:%M")}
 
 # Yahoo Finance bloquea muy seguido las peticiones que vienen de IPs de
 # proveedores cloud (Railway, Render, AWS, etc.) porque las detecta como
