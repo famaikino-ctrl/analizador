@@ -469,6 +469,18 @@
     <div class="grid grid-3 hidden" id="portfolio-summary">
       <div class="card"><div class="card-title">Valor total</div><div class="stat-value mono" id="pf-total">—</div></div>
     </div>
+    <div id="concentration-warnings" style="margin-top:16px;"></div>
+    <div class="grid grid-2 hidden" id="sector-breakdown-wrap" style="margin-top:16px;">
+      <div class="card">
+        <div class="card-title">Concentración por sector</div>
+        <table><thead><tr><th>Sector</th><th>Valor</th><th>Peso %</th><th>Riesgo</th></tr></thead>
+        <tbody id="sector-breakdown-body"></tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-title">Distribución visual</div>
+        <div id="sector-bars"></div>
+      </div>
+    </div>
     <div class="card hidden" id="portfolio-results" style="margin-top:16px;">
       <table>
         <thead><tr>

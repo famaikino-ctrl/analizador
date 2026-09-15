@@ -888,6 +888,33 @@ document.getElementById('calc-portfolio-btn').addEventListener('click', async ()
         <td>${p.score}</td><td>${fmtMoney(p.price_target_base)}</td>
       </tr>`;
     }).join('');
+
+    // Concentración por sector
+    const riskColor = { muy_alta: 'var(--red)', alta: 'var(--amber)', moderada: 'var(--accent)', baja: 'var(--green)' };
+    const riskLabel = { muy_alta: 'Muy alta', alta: 'Alta', moderada: 'Moderada', baja: 'Baja' };
+    if (data.sector_breakdown && data.sector_breakdown.length) {
+      document.getElementById('sector-breakdown-body').innerHTML = data.sector_breakdown.map(s => `
+        <tr>
+          <td class="text-cell">${s.sector}</td>
+          <td>${fmtMoney(s.value)}</td>
+          <td>${s.weight_pct}%</td>
+          <td class="text-cell" style="color:${riskColor[s.concentration_risk]};font-weight:600;">${riskLabel[s.concentration_risk]}</td>
+        </tr>
+      `).join('');
+      document.getElementById('sector-bars').innerHTML = data.sector_breakdown.map(s => `
+        <div class="score-bar-row">
+          <span class="score-bar-label" style="width:120px;">${s.sector}</span>
+          <div class="score-bar-track"><div class="score-bar-fill" style="width:${s.weight_pct}%;background:${riskColor[s.concentration_risk]}"></div></div>
+          <span class="score-bar-val">${s.weight_pct}%</span>
+        </div>
+      `).join('');
+      document.getElementById('sector-breakdown-wrap').classList.remove('hidden');
+    }
+
+    document.getElementById('concentration-warnings').innerHTML = (data.concentration_warnings || []).map(w =>
+      `<div class="risk-warning">⚠️ ${w}</div>`
+    ).join('');
+
     document.getElementById('portfolio-summary').classList.remove('hidden');
     document.getElementById('portfolio-results').classList.remove('hidden');
   } catch (err) {
