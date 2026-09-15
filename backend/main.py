@@ -263,6 +263,7 @@ def api_portfolio(positions: List[dict] = Body(...)):
 
         enriched.append({
             "ticker": ticker,
+            "sector": data["company"].get("sector") or "Sin clasificar",
             "quantity": quantity,
             "avg_price": avg_price,
             "current_price": current_price,
@@ -279,7 +280,43 @@ def api_portfolio(positions: List[dict] = Body(...)):
         if "current_value" in item and total_value > 0:
             item["weight_pct"] = round(item["current_value"] / total_value * 100, 2)
 
-    return JSONResponse(content=_sanitize({"positions": enriched, "total_value": round(total_value, 2)}))
+    # ---------- Concentracion por sector ----------
+    sector_totals: dict = {}
+    for item in enriched:
+        if "current_value" not in item:
+            continue
+        sector = item.get("sector", "Sin clasificar")
+        sector_totals[sector] = sector_totals.get(sector, 0) + item["current_value"]
+
+    sector_breakdown = []
+    for sector, value in sorted(sector_totals.items(), key=lambda x: -x[1]):
+        pct = (value / total_value * 100) if total_value else 0
+        if pct >= 50:
+            risk_level = "muy_alta"
+        elif pct >= 30:
+            risk_level = "alta"
+        elif pct >= 15:
+            risk_level = "moderada"
+        else:
+            risk_level = "baja"
+        sector_breakdown.append({
+            "sector": sector,
+            "value": round(value, 2),
+            "weight_pct": round(pct, 2),
+            "concentration_risk": risk_level,
+        })
+
+    concentration_warnings = [
+        f"'{s['sector']}' representa el {s['weight_pct']}% de tu cartera — concentracion {s['concentration_risk'].replace('_', ' ')}."
+        for s in sector_breakdown if s["concentration_risk"] in ("alta", "muy_alta")
+    ]
+
+    return JSONResponse(content=_sanitize({
+        "positions": enriched,
+        "total_value": round(total_value, 2),
+        "sector_breakdown": sector_breakdown,
+        "concentration_warnings": concentration_warnings,
+    }))
 
 
 # --------------------------------------------------------------------------
