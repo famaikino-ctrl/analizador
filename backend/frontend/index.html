@@ -15,6 +15,7 @@
   <form class="ticker-form" id="ticker-form">
     <input type="text" id="ticker-input" name="ticker" placeholder="Ticker, ej: NVDA" autocomplete="off" required>
     <button type="submit" class="btn btn-primary" id="analyze-btn">ANALIZAR</button>
+    <button type="button" class="theme-toggle" id="favorite-toggle-btn" title="Agregar a favoritos">☆</button>
   </form>
 
   <div class="tabs">
@@ -30,6 +31,8 @@
 
   <button class="theme-toggle" id="theme-toggle" title="Cambiar tema">🌙</button>
 </div>
+
+<div id="favorites-strip" class="favorites-strip hidden"></div>
 
 <div class="container">
 

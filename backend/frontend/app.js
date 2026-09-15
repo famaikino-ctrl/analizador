@@ -116,6 +116,7 @@ let lastAnalysisData = null;
 
 function renderAnalysis(d) {
   lastAnalysisData = d;
+  updateFavoriteButton();
   const currency = d.quote.currency || 'USD';
 
   // Header
@@ -340,6 +341,98 @@ function renderAnalysis(d) {
   // Guardar en el historial local (no consume cuota de la API)
   saveToHistory(d);
 }
+
+// ---------------------------------------------------------------------
+// Favoritos / Watchlist (guardado en localStorage del navegador)
+// ---------------------------------------------------------------------
+const FAVORITES_KEY = 'stocklens_favorites_v1';
+
+function getFavorites() {
+  try {
+    return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveFavorites(list) {
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(list));
+}
+
+function isFavorite(ticker) {
+  return getFavorites().includes(ticker);
+}
+
+function toggleFavorite(ticker) {
+  let list = getFavorites();
+  if (list.includes(ticker)) {
+    list = list.filter(t => t !== ticker);
+  } else {
+    list.unshift(ticker);
+    list = list.slice(0, 20); // máximo 20 favoritos
+  }
+  saveFavorites(list);
+  renderFavoritesStrip();
+  updateFavoriteButton();
+}
+
+function updateFavoriteButton() {
+  const btn = document.getElementById('favorite-toggle-btn');
+  if (!currentTicker) {
+    btn.textContent = '☆';
+    btn.title = 'Analizá un ticker primero';
+    return;
+  }
+  const fav = isFavorite(currentTicker);
+  btn.textContent = fav ? '★' : '☆';
+  btn.title = fav ? 'Quitar de favoritos' : 'Agregar a favoritos';
+  btn.style.color = fav ? 'var(--amber)' : '';
+}
+
+function renderFavoritesStrip() {
+  const list = getFavorites();
+  const strip = document.getElementById('favorites-strip');
+  if (!list.length) {
+    strip.classList.add('hidden');
+    strip.innerHTML = '';
+    return;
+  }
+  strip.classList.remove('hidden');
+  strip.innerHTML = '⭐ ' + list.map(t => `
+    <span class="fav-chip" data-ticker="${t}">${t}<span class="fav-remove" data-remove="${t}">✕</span></span>
+  `).join('');
+
+  strip.querySelectorAll('.fav-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      if (e.target.dataset.remove) return; // el click de la X se maneja aparte
+      const ticker = chip.dataset.ticker;
+      document.getElementById('ticker-input').value = ticker;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector('.tab-btn[data-tab="analysis"]').classList.add('active');
+      ['analysis', 'market', 'compare', 'scanner', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
+        document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== 'analysis');
+      });
+      currentTicker = ticker;
+      loadAnalysis(ticker, currentTimeframe);
+    });
+  });
+  strip.querySelectorAll('.fav-remove').forEach(x => {
+    x.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFavorite(e.target.dataset.remove);
+    });
+  });
+}
+
+document.getElementById('favorite-toggle-btn').addEventListener('click', () => {
+  if (!currentTicker) {
+    alert('Primero analizá un ticker para poder agregarlo a favoritos.');
+    return;
+  }
+  toggleFavorite(currentTicker);
+});
+
+renderFavoritesStrip();
 
 // ---------------------------------------------------------------------
 // Historial de análisis y señales (guardado en localStorage del navegador)
