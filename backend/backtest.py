@@ -177,6 +177,42 @@ def run_backtest(df: pd.DataFrame, entry_threshold: float = 65, stop_atr_mult: f
     running_max = np.maximum.accumulate(cumulative) if len(cumulative) else np.array([0])
     max_drawdown = float(np.min(cumulative - running_max)) if len(cumulative) else 0.0
 
+    # ---------- Metricas avanzadas ----------
+    # Sharpe y Sortino simplificados: se calculan sobre el retorno POR
+    # OPERACION (no por dia), porque las operaciones duran distinto tiempo
+    # cada una. Esto NO es el Sharpe ratio anualizado estandar que usan
+    # los profesionales (que se calcula sobre retornos diarios de una
+    # cartera) -- es una version simplificada, valida solo para comparar
+    # configuraciones entre si, no para comparar contra otros activos.
+    returns_arr = np.array(returns)
+    std_returns = float(np.std(returns_arr, ddof=1)) if len(returns_arr) > 1 else 0.0
+    sharpe_simplified = round(avg_return / std_returns, 2) if std_returns > 0 else None
+
+    downside = returns_arr[returns_arr < 0]
+    downside_std = float(np.std(downside, ddof=1)) if len(downside) > 1 else (abs(float(downside[0])) if len(downside) == 1 else 0.0)
+    sortino_simplified = round(avg_return / downside_std, 2) if downside_std > 0 else None
+
+    expectancy = round((win_rate / 100 * avg_win) + ((1 - win_rate / 100) * avg_loss), 2)
+
+    best_trade = max(trades, key=lambda t: t["return_pct"])
+    worst_trade = min(trades, key=lambda t: t["return_pct"])
+    avg_days_held = round(float(np.mean([t["days_held"] for t in trades])), 1)
+
+    max_consecutive_wins = max_consecutive_losses = 0
+    current_streak = 0
+    current_type = None
+    for r in returns:
+        is_win = r > 0
+        if current_type == is_win:
+            current_streak += 1
+        else:
+            current_type = is_win
+            current_streak = 1
+        if is_win:
+            max_consecutive_wins = max(max_consecutive_wins, current_streak)
+        else:
+            max_consecutive_losses = max(max_consecutive_losses, current_streak)
+
     return {
         "trades": trades,
         "num_trades": len(trades),
@@ -186,6 +222,14 @@ def run_backtest(df: pd.DataFrame, entry_threshold: float = 65, stop_atr_mult: f
         "avg_loss_pct": round(avg_loss, 2),
         "profit_factor": round(profit_factor, 2) if profit_factor is not None else None,
         "max_drawdown_pct": round(max_drawdown, 2),
+        "sharpe_simplified": sharpe_simplified,
+        "sortino_simplified": sortino_simplified,
+        "expectancy_pct": expectancy,
+        "best_trade_pct": best_trade["return_pct"],
+        "worst_trade_pct": worst_trade["return_pct"],
+        "avg_days_held": avg_days_held,
+        "max_consecutive_wins": max_consecutive_wins,
+        "max_consecutive_losses": max_consecutive_losses,
         "total_return_pct": round(float(sum(returns)), 2),
         "params": {
             "side": side,
