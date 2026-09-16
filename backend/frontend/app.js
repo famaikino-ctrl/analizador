@@ -124,6 +124,15 @@ function renderAnalysis(d) {
     `${d.company.sector || 'N/D'} — ${d.company.industry || 'N/D'}`;
   document.getElementById('company-name').textContent = `${d.company.name} (${d.ticker})`;
   document.getElementById('company-exchange').textContent = d.company.exchange || 'N/D';
+
+  const statusPillClass = { abierto: 'pill-green', pre_market: 'pill-yellow', after_hours: 'pill-yellow', cerrado: 'pill-gray' };
+  const statusIcon = { abierto: '🟢', pre_market: '🟡', after_hours: '🟡', cerrado: '⚫' };
+  const ms = d.market_status;
+  const statusEl = document.getElementById('market-status-pill');
+  statusEl.textContent = `${statusIcon[ms.status] || ''} ${ms.label}`;
+  statusEl.className = 'pill ' + (statusPillClass[ms.status] || 'pill-gray');
+  statusEl.title = `Hora de Nueva York: ${ms.ny_time}`;
+
   document.getElementById('quote-price').textContent = fmtMoney(d.quote.price, currency);
   const changeEl = document.getElementById('quote-change');
   changeEl.textContent = fmtPct(d.quote.change_pct);
@@ -764,8 +773,53 @@ document.getElementById('scanner-btn').addEventListener('click', async () => {
 // ---------------------------------------------------------------------
 // Backtesting simple
 // ---------------------------------------------------------------------
+let backtestChartInstance = null;
+
+function renderBacktestChart(candles, trades, side = 'long') {
+  const container = document.getElementById('backtest-chart-container');
+  container.innerHTML = '';
+  if (!candles || !candles.length) return;
+
+  const colors = chartColors();
+  backtestChartInstance = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: 360,
+    layout: { background: { color: colors.bg }, textColor: colors.text },
+    grid: { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
+    rightPriceScale: { borderColor: colors.border },
+    timeScale: { borderColor: colors.border },
+  });
+
+  const series = backtestChartInstance.addCandlestickSeries({
+    upColor: '#2FD98A', downColor: '#FF5C72', borderVisible: false,
+    wickUpColor: '#2FD98A', wickDownColor: '#FF5C72',
+  });
+  series.setData(candles);
+
+  const entryShape = side === 'short' ? 'arrowDown' : 'arrowUp';
+  const entryPos = side === 'short' ? 'aboveBar' : 'belowBar';
+  const entryColor = side === 'short' ? '#FF5C72' : '#4C8DFF';
+  const entryLabel = side === 'short' ? 'Entrada short' : 'Entrada';
+
+  const markers = [];
+  trades.forEach(t => {
+    markers.push({ time: t.entry_date, position: entryPos, color: entryColor, shape: entryShape, text: entryLabel });
+    const exitColor = t.outcome === 'objetivo' ? '#2FD98A' : t.outcome === 'stop' ? '#FF5C72' : '#8B93A7';
+    const exitShape = side === 'short' ? 'arrowUp' : 'arrowDown';
+    const exitPos = side === 'short' ? 'belowBar' : 'aboveBar';
+    markers.push({ time: t.exit_date, position: exitPos, color: exitColor, shape: exitShape, text: t.outcome });
+  });
+  markers.sort((a, b) => a.time.localeCompare(b.time));
+  series.setMarkers(markers);
+
+  window.addEventListener('resize', () => {
+    if (backtestChartInstance) backtestChartInstance.applyOptions({ width: container.clientWidth });
+  });
+}
+
 document.getElementById('backtest-run-btn').addEventListener('click', async () => {
   const ticker = document.getElementById('backtest-ticker').value.trim().toUpperCase();
+  const side = document.getElementById('backtest-side').value;
   const threshold = parseFloat(document.getElementById('backtest-threshold').value) || 65;
   const holding = parseInt(document.getElementById('backtest-holding').value) || 20;
   if (!ticker) return;
@@ -775,7 +829,7 @@ document.getElementById('backtest-run-btn').addEventListener('click', async () =
   document.getElementById('backtest-loading').classList.remove('hidden');
 
   try {
-    const res = await fetch(`${API_BASE}/api/backtest/${encodeURIComponent(ticker)}?entry_threshold=${threshold}&max_holding_days=${holding}`);
+    const res = await fetch(`${API_BASE}/api/backtest/${encodeURIComponent(ticker)}?entry_threshold=${threshold}&max_holding_days=${holding}&side=${side}`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Error desconocido' }));
       throw new Error(err.detail || 'No se pudo ejecutar el backtest.');
@@ -795,6 +849,7 @@ document.getElementById('backtest-run-btn').addEventListener('click', async () =
       document.getElementById('bt-note').textContent = data.note || 'No se generaron operaciones en el período disponible.';
       document.getElementById('bt-note').classList.remove('hidden');
       document.getElementById('bt-trades-body').innerHTML = '';
+      renderBacktestChart(data.candles || [], [], side);
       document.getElementById('backtest-content').classList.remove('hidden');
       return;
     }
@@ -828,6 +883,7 @@ document.getElementById('backtest-run-btn').addEventListener('click', async () =
       </tr>
     `).join('');
 
+    renderBacktestChart(data.candles, data.trades, side);
     document.getElementById('backtest-content').classList.remove('hidden');
   } catch (err) {
     document.getElementById('backtest-error').textContent = err.message;
