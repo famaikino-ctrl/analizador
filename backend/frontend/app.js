@@ -846,6 +846,14 @@ document.getElementById('backtest-run-btn').addEventListener('click', async () =
       document.getElementById('bt-pf').textContent = 'N/D';
       document.getElementById('bt-drawdown').textContent = 'N/D';
       document.getElementById('bt-sample').textContent = `${data.sample_size_days || '—'} velas`;
+      document.getElementById('bt-sharpe').textContent = 'N/D';
+      document.getElementById('bt-sortino').textContent = 'N/D';
+      document.getElementById('bt-expectancy').textContent = 'N/D';
+      document.getElementById('bt-avgdays').textContent = 'N/D';
+      document.getElementById('bt-best').textContent = 'N/D';
+      document.getElementById('bt-worst').textContent = 'N/D';
+      document.getElementById('bt-streak-win').textContent = 'N/D';
+      document.getElementById('bt-streak-loss').textContent = 'N/D';
       document.getElementById('bt-note').textContent = data.note || 'No se generaron operaciones en el período disponible.';
       document.getElementById('bt-note').classList.remove('hidden');
       document.getElementById('bt-trades-body').innerHTML = '';
@@ -863,6 +871,17 @@ document.getElementById('backtest-run-btn').addEventListener('click', async () =
     document.getElementById('bt-pf').textContent = data.profit_factor != null ? data.profit_factor : 'N/D';
     document.getElementById('bt-drawdown').textContent = fmtPct(data.max_drawdown_pct);
     document.getElementById('bt-sample').textContent = `${data.sample_size_days} velas`;
+    document.getElementById('bt-sharpe').textContent = data.sharpe_simplified != null ? data.sharpe_simplified : 'N/D';
+    document.getElementById('bt-sortino').textContent = data.sortino_simplified != null ? data.sortino_simplified : 'N/D';
+    document.getElementById('bt-expectancy').textContent = fmtPct(data.expectancy_pct);
+    document.getElementById('bt-expectancy').style.color = data.expectancy_pct >= 0 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('bt-avgdays').textContent = data.avg_days_held;
+    document.getElementById('bt-best').textContent = fmtPct(data.best_trade_pct);
+    document.getElementById('bt-best').style.color = 'var(--green)';
+    document.getElementById('bt-worst').textContent = fmtPct(data.worst_trade_pct);
+    document.getElementById('bt-worst').style.color = 'var(--red)';
+    document.getElementById('bt-streak-win').textContent = data.max_consecutive_wins;
+    document.getElementById('bt-streak-loss').textContent = data.max_consecutive_losses;
 
     if (data.note) {
       document.getElementById('bt-note').textContent = '⚠️ ' + data.note;
