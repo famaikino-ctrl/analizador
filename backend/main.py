@@ -127,10 +127,10 @@ def api_news(ticker: str):
 
 
 @app.get("/api/backtest/{ticker}")
-def api_backtest(ticker: str, entry_threshold: float = 65, max_holding_days: int = 20):
+def api_backtest(ticker: str, entry_threshold: float = 65, max_holding_days: int = 20, side: str = "long"):
     """Backtest tecnico simplificado sobre el historial disponible (~100
     dias en el plan gratuito). Usa 1 sola llamada a la API (solo precio,
-    no hace falta OVERVIEW para esto)."""
+    no hace falta OVERVIEW para esto). side: 'long' o 'short'."""
     try:
         df = provider.get_price_history(ticker, period="1y", interval="1d")
     except Exception as exc:
@@ -138,7 +138,7 @@ def api_backtest(ticker: str, entry_threshold: float = 65, max_holding_days: int
     if df.empty:
         raise HTTPException(status_code=404, detail=f"No se encontraron datos para el ticker '{ticker}'.")
 
-    result = run_backtest(df, entry_threshold=entry_threshold, max_holding_days=max_holding_days)
+    result = run_backtest(df, entry_threshold=entry_threshold, max_holding_days=max_holding_days, side=side)
 
     candles = [
         {

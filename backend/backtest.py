@@ -63,15 +63,52 @@ def _simplified_score_series(df: pd.DataFrame) -> pd.Series:
     return total.clip(0, 100), atr_s
 
 
+def _simplified_short_score_series(df: pd.DataFrame):
+    """Version espejo (bajista) del score simplificado, para backtestear
+    el lado SHORT: premia EMAs en orden bajista, MACD bajista, RSI debil
+    y volumen alto en dias de baja."""
+    close = df["Close"]
+    mas = compute_all_mas(close)
+    rsi_s = rsi(close, 14)
+    macd_line, signal_line, hist = macd(close)
+    atr_s = atr(df, 14)
+    vol_avg = df["Volume"].rolling(20).mean()
+
+    ema9, ema20, ema50 = mas["ema9"], mas["ema20"], mas["ema50"]
+
+    trend_score = (
+        (ema9 < ema20).astype(float) * 10 +
+        (ema20 < ema50).astype(float) * 10 +
+        (close < ema20).astype(float) * 10
+    )
+    momentum_score = ((macd_line < signal_line).astype(float) * 15 +
+                       (hist < 0).astype(float) * 10)
+    rsi_score = pd.Series(np.select(
+        [rsi_s > 70, rsi_s > 55, rsi_s >= 45, rsi_s >= 30, rsi_s < 30],
+        [15, 10, 12, 20, 10],
+        default=10,
+    ), index=rsi_s.index).astype(float)
+    price_down = close.diff() < 0
+    volume_score = ((df["Volume"] > 1.5 * vol_avg) & price_down).astype(float) * 15
+
+    total = trend_score + momentum_score + rsi_score + volume_score
+    return total.clip(0, 100), atr_s
+
+
 def run_backtest(df: pd.DataFrame, entry_threshold: float = 65, stop_atr_mult: float = 1.5,
                   target_atr_mult: float = 3.0, max_holding_days: int = 20,
-                  commission_pct: float = 0.0) -> dict:
+                  commission_pct: float = 0.0, side: str = "long") -> dict:
     if df.empty or len(df) < 30:
         return {"error": "No hay suficientes datos historicos para backtestear (se necesitan al menos 30 velas)."}
+    if side not in ("long", "short"):
+        side = "long"
 
     close = df["Close"].reset_index(drop=True)
     dates = df.index
-    score_series, atr_series = _simplified_score_series(df)
+    if side == "long":
+        score_series, atr_series = _simplified_score_series(df)
+    else:
+        score_series, atr_series = _simplified_short_score_series(df)
     score_series = score_series.reset_index(drop=True)
     atr_series = atr_series.reset_index(drop=True)
 
@@ -85,18 +122,29 @@ def run_backtest(df: pd.DataFrame, entry_threshold: float = 65, stop_atr_mult: f
                 in_position = True
                 entry_idx = i
                 entry_price = close.iloc[i]
-                stop_price = entry_price - stop_atr_mult * atr_series.iloc[i]
-                target_price = entry_price + target_atr_mult * atr_series.iloc[i]
+                if side == "long":
+                    stop_price = entry_price - stop_atr_mult * atr_series.iloc[i]
+                    target_price = entry_price + target_atr_mult * atr_series.iloc[i]
+                else:
+                    stop_price = entry_price + stop_atr_mult * atr_series.iloc[i]
+                    target_price = entry_price - target_atr_mult * atr_series.iloc[i]
         else:
             price_now = close.iloc[i]
             days_held = i - entry_idx
-            hit_stop = price_now <= stop_price
-            hit_target = price_now >= target_price
+            if side == "long":
+                hit_stop = price_now <= stop_price
+                hit_target = price_now >= target_price
+            else:
+                hit_stop = price_now >= stop_price
+                hit_target = price_now <= target_price
             timed_out = days_held >= max_holding_days
 
             if hit_stop or hit_target or timed_out or i == len(close) - 1:
                 exit_price = price_now
-                gross_return_pct = (exit_price - entry_price) / entry_price * 100
+                if side == "long":
+                    gross_return_pct = (exit_price - entry_price) / entry_price * 100
+                else:
+                    gross_return_pct = (entry_price - exit_price) / entry_price * 100
                 net_return_pct = gross_return_pct - (commission_pct * 2)
                 outcome = "objetivo" if hit_target else ("stop" if hit_stop else "tiempo_agotado")
                 trades.append({
@@ -140,6 +188,7 @@ def run_backtest(df: pd.DataFrame, entry_threshold: float = 65, stop_atr_mult: f
         "max_drawdown_pct": round(max_drawdown, 2),
         "total_return_pct": round(float(sum(returns)), 2),
         "params": {
+            "side": side,
             "entry_threshold": entry_threshold,
             "stop_atr_mult": stop_atr_mult,
             "target_atr_mult": target_atr_mult,
