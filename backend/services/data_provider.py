@@ -463,6 +463,29 @@ class AlphaVantageProvider(DataProvider):
             return None
         return {"low": None, "mean": mean, "high": None, "num_analysts": None}
 
+    def get_weekly_price_history(self, ticker: str) -> pd.DataFrame:
+        """Serie semanal (gratis, con años de historial) usada especificamente
+        para calcular EMAs largas (150/200) que el historial diario gratuito
+        (~100 dias) no puede sostener."""
+        data = self._request({"function": "TIME_SERIES_WEEKLY", "symbol": ticker.upper()})
+        series = data.get("Weekly Time Series", {}) or {}
+        if not series:
+            return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+        rows = []
+        for date_str, values in series.items():
+            try:
+                rows.append({
+                    "Date": pd.to_datetime(date_str),
+                    "Open": float(values["1. open"]), "High": float(values["2. high"]),
+                    "Low": float(values["3. low"]), "Close": float(values["4. close"]),
+                    "Volume": float(values["5. volume"]),
+                })
+            except (KeyError, ValueError):
+                continue
+        if not rows:
+            return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+        return pd.DataFrame(rows).set_index("Date").sort_index()
+
     def get_news(self, ticker: str, limit: int = 8) -> dict:
         """Noticias recientes con sentimiento, via el endpoint NEWS_SENTIMENT
         de Alpha Vantage. No siempre esta disponible en todas las cuentas

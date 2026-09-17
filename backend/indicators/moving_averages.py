@@ -15,6 +15,7 @@ def compute_all_mas(close: pd.Series) -> dict:
         "ema20": ema(close, 20),
         "ema50": ema(close, 50),
         "ema100": ema(close, 100),
+        "ema150": ema(close, 150),
         "ema200": ema(close, 200),
         "sma20": sma(close, 20),
         "sma50": sma(close, 50),

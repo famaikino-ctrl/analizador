@@ -14,6 +14,7 @@ from analysis import analyze_ticker
 from notifications import run_daily_alert_check, send_telegram_message
 from market_overview import get_market_snapshot
 from backtest import run_backtest
+from pullback_scanner import check_ema_pullback_buy, check_resistance_or_ath_sell
 
 app = FastAPI(title="Stock Analyzer API")
 
@@ -198,6 +199,50 @@ def api_compare(tickers: str):
             "upside_pct": data["price_target"].get("upside_pct"),
         })
     return JSONResponse(content=_sanitize({"tickers": rows}))
+
+
+@app.get("/api/pullback-scanner")
+def api_pullback_scanner(tickers: str):
+    """Screener de 2 patrones: compra por rebote en EMA150/200 semanal, y
+    venta/toma de ganancias por estar cerca de resistencia o maximo de 52
+    semanas. Maximo 6 tickers (usa 2 llamadas a la API por ticker: semanal
+    + diario)."""
+    symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()][:6]
+    if not symbols:
+        raise HTTPException(status_code=400, detail="Debes indicar al menos un ticker.")
+    if not hasattr(provider, "get_weekly_price_history"):
+        raise HTTPException(status_code=501, detail="El proveedor de datos actual no soporta este screener.")
+
+    results = []
+    for sym in symbols:
+        try:
+            weekly_df = provider.get_weekly_price_history(sym)
+            daily_df = provider.get_price_history(sym, period="1y", interval="1d")
+            quote = provider.get_quote(sym)
+        except Exception as exc:
+            results.append({"ticker": sym, "error": str(exc)})
+            continue
+
+        if daily_df.empty:
+            results.append({"ticker": sym, "error": f"No se encontraron datos para '{sym}'."})
+            continue
+
+        from levels.support_resistance import detect_levels
+        current_price = quote.get("price") or float(daily_df["Close"].iloc[-1])
+        levels = detect_levels(daily_df, current_price, quote.get("week52_high"), quote.get("week52_low"))
+        nearest_resistance = levels["resistances"][0] if levels["resistances"] else None
+
+        buy_check = check_ema_pullback_buy(weekly_df)
+        sell_check = check_resistance_or_ath_sell(current_price, quote.get("week52_high"), nearest_resistance)
+
+        results.append({
+            "ticker": sym,
+            "price": current_price,
+            "buy_signal": buy_check,
+            "sell_signal": sell_check,
+        })
+
+    return JSONResponse(content=_sanitize({"results": results}))
 
 
 @app.get("/api/scanner")
