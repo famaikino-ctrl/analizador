@@ -269,3 +269,18 @@ tr:last-child td{border-bottom:none;}
 .risk-result-row span:first-child{color:var(--text-dim);}
 .risk-result-row span:last-child{font-family:var(--font-mono);font-weight:600;}
 .risk-warning{background:rgba(240,180,41,.12);color:var(--amber);padding:10px 12px;border-radius:8px;font-size:13px;margin-top:10px;}
+
+/* ---------- Exportar a PDF (via Imprimir del navegador) ---------- */
+@media print {
+  .topbar, .favorites-strip, .tabs, .theme-toggle, #ticker-form,
+  #analysis-empty, .tf-btn, .timeframe-row, .btn, #load-news-btn,
+  #favorite-toggle-btn, .footer-note, #print-analysis-btn {
+    display: none !important;
+  }
+  body { background: #fff !important; color: #111 !important; }
+  .card, .conclusion-banner { border: 1px solid #ccc !important; background: #fff !important; break-inside: avoid; }
+  .stat-value, .stat-sub, td, th, .card-title { color: #111 !important; }
+  .container { padding: 0 !important; max-width: 100% !important; }
+  .section-heading { color: #111 !important; }
+  #chart-container, #volume-container { break-inside: avoid; }
+}

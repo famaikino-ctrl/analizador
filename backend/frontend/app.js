@@ -444,8 +444,16 @@ document.getElementById('favorite-toggle-btn').addEventListener('click', () => {
 renderFavoritesStrip();
 
 // ---------------------------------------------------------------------
-// Historial de análisis y señales (guardado en localStorage del navegador)
+// Exportar a PDF (via Imprimir del navegador)
 // ---------------------------------------------------------------------
+document.getElementById('print-analysis-btn').addEventListener('click', () => {
+  if (!lastAnalysisData) return;
+  const originalTitle = document.title;
+  const today = new Date().toISOString().slice(0, 10);
+  document.title = `StockLens - ${lastAnalysisData.ticker} - ${today}`;
+  window.print();
+  document.title = originalTitle;
+});
 const HISTORY_KEY = 'stocklens_history_v1';
 const HISTORY_MAX_ENTRIES = 300;
 
