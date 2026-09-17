@@ -23,6 +23,7 @@
     <button class="tab-btn" data-tab="market">🌍 Mercado</button>
     <button class="tab-btn" data-tab="compare">Comparar</button>
     <button class="tab-btn" data-tab="scanner">🔥 Explosivas</button>
+    <button class="tab-btn" data-tab="pullback">🎯 EMA/Resistencia</button>
     <button class="tab-btn" data-tab="risk">📐 Riesgo</button>
     <button class="tab-btn" data-tab="history">📜 Historial</button>
     <button class="tab-btn" data-tab="backtest">⏮️ Backtest</button>
@@ -336,6 +337,28 @@
     <div id="scanner-loading" class="loader hidden"><div class="spinner"></div> Buscando configuraciones de ruptura...</div>
     <div id="scanner-error" class="error-banner hidden"></div>
     <div id="scanner-results" class="grid grid-2"></div>
+  </div>
+
+  <!-- ========================= TAB: PULLBACK/RESISTANCE SCANNER ========================= -->
+  <div id="tab-pullback" class="hidden">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">🎯 Rebote en EMA150/200 (compra) y Resistencia/Máximo histórico (venta)</div>
+      <p class="stat-sub">
+        <b>Compra:</b> detecta si el precio está cerca de su EMA150 o EMA200 <b>semanal</b> (calculada con años de historial,
+        no con los ~5 meses del historial diario gratuito) mientras la tendencia de fondo sigue siendo alcista — un patrón
+        clásico de "pullback a media larga en tendencia alcista".<br>
+        <b>Venta / toma de ganancias:</b> detecta si el precio está cerca de una resistencia relevante o de su máximo de 52 semanas.<br>
+        Ninguno de los dos es una garantía de que vaya a rebotar o caer — son patrones técnicos, no predicciones.
+        Usa 2 consultas de tu cuota diaria por ticker (máximo 6 a la vez).
+      </p>
+      <div class="input-row" style="margin-top:10px;">
+        <input type="text" id="pullback-input" placeholder="AAPL, MSFT, NVDA (máx. 6)" style="flex:1;text-transform:uppercase;">
+        <button class="btn btn-primary" id="pullback-btn">Escanear</button>
+      </div>
+    </div>
+    <div id="pullback-loading" class="loader hidden"><div class="spinner"></div> Analizando EMAs semanales y resistencias...</div>
+    <div id="pullback-error" class="error-banner hidden"></div>
+    <div id="pullback-results" class="grid grid-2"></div>
   </div>
 
   <!-- ========================= TAB: RISK CALCULATOR ========================= -->

@@ -59,7 +59,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['analysis', 'market', 'compare', 'scanner', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
+    ['analysis', 'market', 'compare', 'scanner', 'pullback', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
       document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== btn.dataset.tab);
     });
     if (btn.dataset.tab === 'history') renderHistory();
@@ -418,7 +418,7 @@ function renderFavoritesStrip() {
       document.getElementById('ticker-input').value = ticker;
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelector('.tab-btn[data-tab="analysis"]').classList.add('active');
-      ['analysis', 'market', 'compare', 'scanner', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
+      ['analysis', 'market', 'compare', 'scanner', 'pullback', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
         document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== 'analysis');
       });
       currentTicker = ticker;
@@ -919,6 +919,49 @@ document.getElementById('backtest-run-btn').addEventListener('click', async () =
     document.getElementById('backtest-loading').classList.add('hidden');
   }
 });
+// ---------------------------------------------------------------------
+// Scanner de rebote en EMA150/200 y resistencia/máximo histórico
+// ---------------------------------------------------------------------
+document.getElementById('pullback-btn').addEventListener('click', async () => {
+  const raw = document.getElementById('pullback-input').value.trim();
+  if (!raw) return;
+  document.getElementById('pullback-error').classList.add('hidden');
+  document.getElementById('pullback-results').innerHTML = '';
+  document.getElementById('pullback-loading').classList.remove('hidden');
+  try {
+    const res = await fetch(`${API_BASE}/api/pullback-scanner?tickers=${encodeURIComponent(raw)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'No se pudo ejecutar el escaneo.' }));
+      throw new Error(err.detail);
+    }
+    const data = await res.json();
+    document.getElementById('pullback-results').innerHTML = data.results.map(r => {
+      if (r.error) return `<div class="card"><div class="card-title">${r.ticker}</div><div class="stat-sub">${r.error}</div></div>`;
+      const buy = r.buy_signal;
+      const sell = r.sell_signal;
+      return `<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:17px;font-weight:700;">${r.ticker}</div>
+          <div class="stat-value mono" style="font-size:16px;">${fmtMoney(r.price)}</div>
+        </div>
+        <div style="margin-top:10px;padding:10px;border-radius:8px;background:${buy.triggered ? 'rgba(47,217,138,.12)' : 'var(--surface-2)'};">
+          <b style="color:${buy.triggered ? 'var(--green)' : 'var(--text-dim)'}">${buy.triggered ? '🎯 COMPRA: rebote en media larga' : 'Sin señal de rebote en EMA150/200'}</b>
+          <div class="stat-sub" style="margin-top:4px;">${buy.reason}</div>
+        </div>
+        <div style="margin-top:8px;padding:10px;border-radius:8px;background:${sell.triggered ? 'rgba(255,92,114,.12)' : 'var(--surface-2)'};">
+          <b style="color:${sell.triggered ? 'var(--red)' : 'var(--text-dim)'}">${sell.triggered ? '⚠️ VENTA/toma de ganancias: cerca de resistencia' : 'Sin señal de resistencia/máximo cercano'}</b>
+          ${sell.reasons.length ? `<div class="stat-sub" style="margin-top:4px;">${sell.reasons.join('<br>')}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    document.getElementById('pullback-error').textContent = err.message;
+    document.getElementById('pullback-error').classList.remove('hidden');
+  } finally {
+    document.getElementById('pullback-loading').classList.add('hidden');
+  }
+});
+
 document.getElementById('risk-use-analysis-btn').addEventListener('click', () => {
   if (!lastAnalysisData) {
     alert('Primero analizá un ticker en la pestaña "Análisis" para poder traer sus precios acá.');
