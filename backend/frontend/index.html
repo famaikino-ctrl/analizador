@@ -24,6 +24,7 @@
     <button class="tab-btn" data-tab="compare">Comparar</button>
     <button class="tab-btn" data-tab="scanner">🔥 Explosivas</button>
     <button class="tab-btn" data-tab="pullback">🎯 EMA/Resistencia</button>
+    <button class="tab-btn" data-tab="recommend">📋 Recomendaciones</button>
     <button class="tab-btn" data-tab="risk">📐 Riesgo</button>
     <button class="tab-btn" data-tab="history">📜 Historial</button>
     <button class="tab-btn" data-tab="backtest">⏮️ Backtest</button>
@@ -359,6 +360,26 @@
     <div id="pullback-loading" class="loader hidden"><div class="spinner"></div> Analizando EMAs semanales y resistencias...</div>
     <div id="pullback-error" class="error-banner hidden"></div>
     <div id="pullback-results" class="grid grid-2"></div>
+  </div>
+
+  <!-- ========================= TAB: FULL RECOMMENDATION ========================= -->
+  <div id="tab-recommend" class="hidden">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">📋 Recomendaciones consolidadas</div>
+      <p class="stat-sub">
+        Junta TODO lo que calcula la app (dirección LONG/SHORT, score, breakout, rebote en EMA150/200 semanal,
+        cercanía a resistencia/máximo histórico) en una sola recomendación por ticker. Ideal para pasar tu cartera
+        real de a lotes. Usa 3 consultas de tu cuota diaria por ticker — <b>máximo 8 tickers por vez</b> (24 de tus 25 consultas).
+        Sigue siendo un sistema cuantitativo educativo, no asesoramiento financiero.
+      </p>
+      <div class="input-row" style="margin-top:10px;">
+        <input type="text" id="recommend-input" placeholder="AAPL, MSFT, NVDA... (máx. 8)" style="flex:1;text-transform:uppercase;">
+        <button class="btn btn-primary" id="recommend-btn">Generar recomendaciones</button>
+      </div>
+    </div>
+    <div id="recommend-loading" class="loader hidden"><div class="spinner"></div> Analizando cada ticker (puede tardar varios minutos)...</div>
+    <div id="recommend-error" class="error-banner hidden"></div>
+    <div id="recommend-results"></div>
   </div>
 
   <!-- ========================= TAB: RISK CALCULATOR ========================= -->

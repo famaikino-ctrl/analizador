@@ -59,7 +59,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['analysis', 'market', 'compare', 'scanner', 'pullback', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
+    ['analysis', 'market', 'compare', 'scanner', 'pullback', 'recommend', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
       document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== btn.dataset.tab);
     });
     if (btn.dataset.tab === 'history') renderHistory();
@@ -418,7 +418,7 @@ function renderFavoritesStrip() {
       document.getElementById('ticker-input').value = ticker;
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelector('.tab-btn[data-tab="analysis"]').classList.add('active');
-      ['analysis', 'market', 'compare', 'scanner', 'pullback', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
+      ['analysis', 'market', 'compare', 'scanner', 'pullback', 'recommend', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
         document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== 'analysis');
       });
       currentTicker = ticker;
@@ -959,6 +959,49 @@ document.getElementById('pullback-btn').addEventListener('click', async () => {
     document.getElementById('pullback-error').classList.remove('hidden');
   } finally {
     document.getElementById('pullback-loading').classList.add('hidden');
+  }
+});
+
+// ---------------------------------------------------------------------
+// Recomendaciones consolidadas
+// ---------------------------------------------------------------------
+document.getElementById('recommend-btn').addEventListener('click', async () => {
+  const raw = document.getElementById('recommend-input').value.trim();
+  if (!raw) return;
+  document.getElementById('recommend-error').classList.add('hidden');
+  document.getElementById('recommend-results').innerHTML = '';
+  document.getElementById('recommend-loading').classList.remove('hidden');
+  try {
+    const res = await fetch(`${API_BASE}/api/full-recommendation?tickers=${encodeURIComponent(raw)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'No se pudo generar las recomendaciones.' }));
+      throw new Error(err.detail);
+    }
+    const data = await res.json();
+    document.getElementById('recommend-results').innerHTML = data.results.map(r => {
+      if (r.error) return `<div class="card" style="margin-bottom:12px;"><div class="card-title">${r.ticker}</div><div class="stat-sub">${r.error}</div></div>`;
+      const rec = r.final_recommendation;
+      return `<div class="card" style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:18px;font-weight:700;">${r.ticker}</div>
+            <div class="stat-sub">${fmtMoney(r.price)} · Dirección: ${r.direction} · Estilo: ${r.trade_style}</div>
+          </div>
+          <span class="pill ${pillClass(rec.color)}" style="font-size:13px;padding:6px 14px;">${rec.label}</span>
+        </div>
+        <div class="stat-sub" style="margin-top:8px;">${rec.reason}</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;">
+          <span class="pill pill-gray">Score LONG: ${r.score_long}</span>
+          <span class="pill pill-gray">Score SHORT: ${r.score_short}</span>
+          <span class="pill pill-gray">Breakout: ${r.breakout_score}/100</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (err) {
+    document.getElementById('recommend-error').textContent = err.message;
+    document.getElementById('recommend-error').classList.remove('hidden');
+  } finally {
+    document.getElementById('recommend-loading').classList.add('hidden');
   }
 });
 
