@@ -201,6 +201,77 @@ def api_compare(tickers: str):
     return JSONResponse(content=_sanitize({"tickers": rows}))
 
 
+def _build_final_recommendation(direction: str, breakout_score: int, buy_signal: dict, sell_signal: dict) -> dict:
+    """Combina direccion LONG/SHORT, breakout y los 2 patrones de EMA
+    larga/resistencia en UNA sola recomendacion resumen por ticker. Es una
+    sintesis de las señales ya calculadas, no un calculo nuevo -- sigue
+    siendo un sistema cuantitativo educativo, no asesoramiento financiero."""
+    if sell_signal.get("triggered") and direction != "SHORT":
+        return {"label": "CONSIDERAR TOMAR GANANCIAS", "color": "yellow",
+                "reason": "Cerca de una resistencia relevante o de su máximo de 52 semanas."}
+    if buy_signal.get("triggered") and direction != "SHORT":
+        return {"label": "POSIBLE COMPRA (rebote en media larga)", "color": "green",
+                "reason": buy_signal.get("reason", "")}
+    if direction == "LONG":
+        return {"label": "MANTENER / COMPRA", "color": "green",
+                "reason": f"Score técnico y de tendencia favorable (breakout {breakout_score}/100)."}
+    if direction == "SHORT":
+        return {"label": "SEÑAL BAJISTA", "color": "red",
+                "reason": "El motor de scoring muestra un sesgo técnico bajista para este ticker."}
+    return {"label": "SIN SEÑAL CLARA", "color": "gray", "reason": "Ninguna condición de compra/venta se activó claramente."}
+
+
+@app.get("/api/full-recommendation")
+def api_full_recommendation(tickers: str):
+    """Junta TODO (score LONG/SHORT, direccion, breakout, rebote EMA
+    larga, resistencia/ATH) en una sola recomendacion por ticker. Maximo 8
+    tickers (usa 3 llamadas a la API por ticker: diario, fundamentales y
+    semanal)."""
+    symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()][:8]
+    if not symbols:
+        raise HTTPException(status_code=400, detail="Debes indicar al menos un ticker.")
+
+    results = []
+    for sym in symbols:
+        try:
+            data = analyze_ticker(provider, sym, "6M")
+        except Exception as exc:
+            results.append({"ticker": sym, "error": str(exc)})
+            continue
+        if "error" in data:
+            results.append({"ticker": sym, "error": data["error"]})
+            continue
+
+        buy_signal = {"triggered": False, "reason": "No disponible."}
+        if hasattr(provider, "get_weekly_price_history"):
+            try:
+                weekly_df = provider.get_weekly_price_history(sym)
+                buy_signal = check_ema_pullback_buy(weekly_df)
+            except Exception:
+                pass
+
+        nearest_resistance = data["levels"]["resistances"][0] if data["levels"]["resistances"] else None
+        sell_signal = check_resistance_or_ath_sell(data["quote"].get("price"), data["quote"].get("week52_high"), nearest_resistance)
+
+        direction = data["direction"]["direction"]
+        final = _build_final_recommendation(direction, data["breakout"]["score"], buy_signal, sell_signal)
+
+        results.append({
+            "ticker": sym,
+            "price": data["quote"].get("price"),
+            "direction": direction,
+            "score_long": data["score"]["total"],
+            "score_short": data["short_score"]["total"],
+            "breakout_score": data["breakout"]["score"],
+            "trade_style": data["trade_style"]["style"],
+            "buy_signal": buy_signal,
+            "sell_signal": sell_signal,
+            "final_recommendation": final,
+        })
+
+    return JSONResponse(content=_sanitize({"results": results}))
+
+
 @app.get("/api/pullback-scanner")
 def api_pullback_scanner(tickers: str):
     """Screener de 2 patrones: compra por rebote en EMA150/200 semanal, y
