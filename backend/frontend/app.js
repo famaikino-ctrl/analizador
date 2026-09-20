@@ -530,6 +530,19 @@ document.getElementById('test-telegram-btn').addEventListener('click', async () 
   }
 });
 
+document.getElementById('test-email-btn').addEventListener('click', async () => {
+  const el = document.getElementById('telegram-test-result');
+  el.textContent = 'Enviando email...';
+  try {
+    const res = await fetch(`${API_BASE}/api/alerts/test-email`, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'No se pudo enviar.');
+    el.textContent = '✅ Email de prueba enviado. Revisá tu bandeja de entrada.';
+  } catch (err) {
+    el.textContent = '❌ ' + err.message;
+  }
+});
+
 document.getElementById('run-alerts-now-btn').addEventListener('click', async () => {
   if (!confirm('Esto va a analizar todos los tickers de ALERT_TICKERS ahora mismo, consumiendo cuota de la API. ¿Continuar?')) return;
   const el = document.getElementById('telegram-test-result');
@@ -601,6 +614,24 @@ function renderChart(d) {
   d.chart.resistances.forEach(price => {
     candleSeries.createPriceLine({ price, color: '#FF5C72', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: 'Resistencia' });
   });
+
+  // Marcadores de señales históricas (dónde el sistema habría entrado/salido en el pasado)
+  if (d.chart.historical_signals && d.chart.historical_signals.length) {
+    const markers = d.chart.historical_signals.map(s => {
+      if (s.type === 'entrada_long') {
+        return { time: s.date, position: 'belowBar', color: '#4C8DFF', shape: 'arrowUp', text: 'Compra' };
+      }
+      if (s.type === 'entrada_short') {
+        return { time: s.date, position: 'aboveBar', color: '#FF5C72', shape: 'arrowDown', text: 'Short' };
+      }
+      const isLongExit = s.type.startsWith('salida_long');
+      const outcome = s.type.split('_').pop();
+      const color = outcome === 'objetivo' ? '#2FD98A' : outcome === 'stop' ? '#FF5C72' : '#8B93A7';
+      return { time: s.date, position: isLongExit ? 'aboveBar' : 'belowBar', color, shape: isLongExit ? 'arrowDown' : 'arrowUp', text: outcome };
+    });
+    markers.sort((a, b) => a.time.localeCompare(b.time));
+    candleSeries.setMarkers(markers);
+  }
 
   // Volumen en panel separado
   const volChart = LightweightCharts.createChart(volContainer, {
@@ -711,11 +742,14 @@ document.getElementById('compare-btn').addEventListener('click', async () => {
     if (!res.ok) throw new Error('No se pudo calcular la comparación.');
     const data = await res.json();
     document.getElementById('compare-table-body').innerHTML = data.tickers.map(t => {
-      if (t.error) return `<tr><td class="text-cell">${t.ticker}</td><td colspan="10" class="text-cell">${t.error}</td></tr>`;
+      if (t.error) return `<tr><td class="text-cell">${t.ticker}</td><td colspan="12" class="text-cell">${t.error}</td></tr>`;
+      const dirColor = t.direction === 'LONG' ? 'var(--green)' : t.direction === 'SHORT' ? 'var(--red)' : 'var(--amber)';
       return `<tr>
         <td class="text-cell">${t.ticker}</td>
         <td>${fmtMoney(t.price)}</td>
         <td style="color:${(t.change_pct||0)>=0?'var(--green)':'var(--red)'}">${fmtPct(t.change_pct)}</td>
+        <td class="text-cell" style="color:${dirColor};font-weight:600;">${t.direction}</td>
+        <td>${t.breakout_score}</td>
         <td>${fmtNum(t.rsi)}</td>
         <td>${fmtNum(t.pe_trailing)}</td>
         <td>${t.revenue_growth != null ? (t.revenue_growth*100).toFixed(1)+'%' : 'N/D'}</td>
