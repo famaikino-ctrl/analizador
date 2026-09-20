@@ -18,9 +18,42 @@ Variables de entorno usadas (configurar en Railway > Variables):
 
 import os
 import time
+import smtplib
+from email.mime.text import MIMEText
 from datetime import datetime, timezone
 
 import requests
+
+
+def send_email(subject: str, body_html: str) -> bool:
+    """Envia un email via SMTP generico. Funciona con Gmail (usando una
+    'contraseña de aplicacion', no la contraseña normal de la cuenta),
+    Outlook, o cualquier proveedor SMTP. Variables de entorno:
+      SMTP_HOST, SMTP_PORT (default 587), SMTP_USER, SMTP_PASSWORD,
+      ALERT_EMAIL_TO (destinatario)
+    """
+    host = os.environ.get("SMTP_HOST", "")
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    user = os.environ.get("SMTP_USER", "")
+    password = os.environ.get("SMTP_PASSWORD", "")
+    to_addr = os.environ.get("ALERT_EMAIL_TO", "")
+
+    if not (host and user and password and to_addr):
+        return False
+
+    msg = MIMEText(body_html, "html", "utf-8")
+    msg["Subject"] = subject
+    msg["From"] = user
+    msg["To"] = to_addr
+
+    try:
+        with smtplib.SMTP(host, port, timeout=15) as server:
+            server.starttls()
+            server.login(user, password)
+            server.sendmail(user, [to_addr], msg.as_string())
+        return True
+    except Exception:
+        return False
 
 
 def send_telegram_message(text: str) -> bool:
@@ -66,6 +99,34 @@ def _format_alert(ticker: str, data: dict) -> str:
 _already_sent_today: dict = {}
 
 
+def _format_alert_html(ticker: str, data: dict) -> str:
+    direction = data["direction"]["direction"]
+    score = data["score"]["total"] if direction == "LONG" else data["short_score"]["total"]
+    price = data["quote"].get("price")
+    currency = data["quote"].get("currency", "USD")
+    conclusion = data["conclusion"] if direction == "LONG" else data["short_conclusion"]
+    entry = conclusion.get("entry_range", [None, None])
+    stop = conclusion.get("stop_loss")
+    targets = conclusion.get("targets", [])
+    color = "#2FD98A" if direction == "LONG" else "#FF5C72"
+
+    rows = f"<p><b>Precio:</b> {price} {currency}</p>"
+    if entry and entry[0] is not None:
+        rows += f"<p><b>Entrada sugerida:</b> {entry[0]} - {entry[1]}</p>"
+    if stop is not None:
+        rows += f"<p><b>Stop loss:</b> {stop}</p>"
+    if targets:
+        rows += f"<p><b>Objetivos:</b> {', '.join(str(t) for t in targets)}</p>"
+
+    return f"""
+    <div style="font-family:Arial,sans-serif;max-width:480px;">
+      <h2 style="color:{color};">{ticker} — {direction} (score {score}/100)</h2>
+      {rows}
+      <p style="color:#888;font-size:12px;">⚠️ Screener cuantitativo educativo, no es asesoramiento financiero.</p>
+    </div>
+    """
+
+
 def run_daily_alert_check(provider) -> dict:
     """Recorre ALERT_TICKERS, analiza cada uno, y manda un mensaje de
     Telegram para los que muestren LONG o SHORT con score >= ALERT_MIN_SCORE.
@@ -107,11 +168,19 @@ def run_daily_alert_check(provider) -> dict:
             continue
 
         message = _format_alert(ticker, data)
-        ok = send_telegram_message(message)
-        if ok:
+        sent_ok = False
+        if os.environ.get("TELEGRAM_BOT_TOKEN"):
+            if send_telegram_message(message):
+                sent_ok = True
+        if os.environ.get("SMTP_HOST"):
+            email_body = _format_alert_html(ticker, data)
+            if send_email(f"StockLens - Alerta {direction}: {ticker}", email_body):
+                sent_ok = True
+
+        if sent_ok:
             _already_sent_today[dedup_key] = True
             sent.append(ticker)
         else:
-            errors.append(f"{ticker}: fallo el envio a Telegram (revisa TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)")
+            errors.append(f"{ticker}: fallo el envio (revisa la configuracion de Telegram y/o Email)")
 
     return {"sent": sent, "skipped": skipped, "errors": errors, "checked_at": datetime.now(timezone.utc).isoformat()}

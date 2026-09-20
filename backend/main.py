@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from services.data_provider import YFinanceProvider, AlphaVantageProvider
 from analysis import analyze_ticker
-from notifications import run_daily_alert_check, send_telegram_message
+from notifications import run_daily_alert_check, send_telegram_message, send_email
 from market_overview import get_market_snapshot
 from backtest import run_backtest
 from pullback_scanner import check_ema_pullback_buy, check_resistance_or_ath_sell
@@ -54,7 +54,8 @@ async def _alert_scheduler_loop():
         now = datetime.now(timezone.utc)
         today_str = now.strftime("%Y-%m-%d")
         if now.hour == check_hour and _last_daily_check_date != today_str:
-            if os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("ALERT_TICKERS"):
+            has_channel = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("SMTP_HOST")
+            if has_channel and os.environ.get("ALERT_TICKERS"):
                 try:
                     run_daily_alert_check(provider)
                 except Exception:
@@ -74,6 +75,15 @@ def api_test_telegram():
     ok = send_telegram_message("✅ StockLens conectado correctamente. Las alertas diarias van a llegar por acá.")
     if not ok:
         raise HTTPException(status_code=400, detail="No se pudo enviar. Revisá TELEGRAM_BOT_TOKEN y TELEGRAM_CHAT_ID en las variables de entorno.")
+    return {"status": "enviado"}
+
+
+@app.post("/api/alerts/test-email")
+def api_test_email():
+    """Envia un email de prueba para confirmar que la configuracion SMTP es correcta."""
+    ok = send_email("StockLens - Email de prueba", "<p>✅ StockLens conectado correctamente por email. Las alertas diarias van a llegar acá.</p>")
+    if not ok:
+        raise HTTPException(status_code=400, detail="No se pudo enviar. Revisá SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD y ALERT_EMAIL_TO en las variables de entorno.")
     return {"status": "enviado"}
 
 
@@ -188,6 +198,8 @@ def api_compare(tickers: str):
             "ticker": sym,
             "price": quote.get("price"),
             "change_pct": quote.get("change_pct"),
+            "direction": data["direction"]["direction"],
+            "breakout_score": data["breakout"]["score"],
             "rsi": data["oscillators"].get("rsi"),
             "pe_trailing": fundamentals.get("pe_trailing"),
             "revenue_growth": fundamentals.get("revenue_growth"),

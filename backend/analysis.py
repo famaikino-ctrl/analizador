@@ -15,6 +15,7 @@ from scoring.short_score import compute_short_score, determine_direction
 from scoring.signals import signal_from_score, multi_horizon_trend, build_alerts, build_conclusion, build_short_conclusion, classify_trade_style
 from scoring.scanner import compute_breakout_score, compute_momentum_5d
 from strategies.entry_strategies import build_strategies, build_short_strategies
+from backtest import run_backtest
 
 
 def _clean(v):
@@ -217,6 +218,20 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
             for idx, v in series.items() if not pd.isna(v)
         ]
 
+    # ---------- Marcadores de señales históricas (reutiliza datos ya cargados, sin costo extra de API) ----------
+    historical_signals = []
+    try:
+        bt_long = run_backtest(df_calc, entry_threshold=60, side="long")
+        for t in bt_long.get("trades", []):
+            historical_signals.append({"date": t["entry_date"], "type": "entrada_long", "price": t["entry_price"]})
+            historical_signals.append({"date": t["exit_date"], "type": f"salida_long_{t['outcome']}", "price": t["exit_price"]})
+        bt_short = run_backtest(df_calc, entry_threshold=60, side="short")
+        for t in bt_short.get("trades", []):
+            historical_signals.append({"date": t["entry_date"], "type": "entrada_short", "price": t["entry_price"]})
+            historical_signals.append({"date": t["exit_date"], "type": f"salida_short_{t['outcome']}", "price": t["exit_price"]})
+    except Exception:
+        historical_signals = []
+
     return {
         "ticker": ticker.upper(),
         "company": company,
@@ -286,5 +301,6 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
             "supports": [s["price"] for s in levels["supports"]],
             "resistances": [r["price"] for r in levels["resistances"]],
             "fibonacci_levels": [lv["price"] for lv in fib["levels"]] if fib else [],
+            "historical_signals": historical_signals,
         },
     }
