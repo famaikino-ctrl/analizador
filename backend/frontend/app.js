@@ -329,15 +329,17 @@ function renderAnalysis(d) {
     free_cash_flow: 'Free Cash Flow', total_debt: 'Deuda Total', total_cash: 'Cash', debt_to_equity: 'Debt/Equity',
     roe: 'ROE', roa: 'ROA', roic: 'ROIC', pe_trailing: 'P/E', pe_forward: 'Forward P/E', peg_ratio: 'PEG',
     ps_ratio: 'P/S', pb_ratio: 'P/B', ev_to_ebitda: 'EV/EBITDA', dividend_yield: 'Dividend Yield',
-    payout_ratio: 'Payout Ratio', beta: 'Beta',
+    payout_ratio: 'Payout Ratio', beta: 'Beta', dividend_date: 'Próximo pago de dividendo', ex_dividend_date: 'Fecha ex-dividendo',
   };
   const pctFields = new Set(['revenue_growth', 'gross_margin', 'operating_margin', 'net_margin', 'roe', 'roa', 'roic', 'dividend_yield', 'payout_ratio']);
   const bigFields = new Set(['revenue', 'ebitda', 'free_cash_flow', 'total_debt', 'total_cash']);
+  const dateFields = new Set(['dividend_date', 'ex_dividend_date']);
   document.querySelector('#fundamentals-table tbody').innerHTML = Object.entries(fundLabels).map(([k, label]) => {
     let v = d.fundamentals[k];
     let display = 'N/D';
     if (v !== null && v !== undefined) {
-      if (pctFields.has(k)) display = (v * 100).toFixed(2) + '%';
+      if (dateFields.has(k)) display = v;
+      else if (pctFields.has(k)) display = (v * 100).toFixed(2) + '%';
       else if (bigFields.has(k)) display = fmtBig(v);
       else display = fmtNum(v);
     }
@@ -751,6 +753,38 @@ document.getElementById('load-news-btn').addEventListener('click', async () => {
     document.getElementById('news-error').classList.remove('hidden');
   } finally {
     document.getElementById('news-loading').classList.add('hidden');
+  }
+});
+
+document.getElementById('load-earnings-btn').addEventListener('click', async () => {
+  if (!currentTicker) return;
+  document.getElementById('earnings-error').classList.add('hidden');
+  document.getElementById('earnings-result').innerHTML = '';
+  document.getElementById('earnings-loading').classList.remove('hidden');
+  try {
+    const res = await fetch(`${API_BASE}/api/earnings/${encodeURIComponent(currentTicker)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'No se pudo estimar la fecha.' }));
+      throw new Error(err.detail);
+    }
+    const data = await res.json();
+    if (!data.available) {
+      document.getElementById('earnings-result').innerHTML = `<div class="stat-sub">${data.note}</div>`;
+      return;
+    }
+    const soon = data.days_until_estimated >= 0 && data.days_until_estimated <= 14;
+    document.getElementById('earnings-result').innerHTML = `
+      <div class="risk-warning" style="background:${soon ? 'rgba(255,92,114,.12)' : 'rgba(76,141,255,.12)'};color:${soon ? 'var(--red)' : 'var(--accent)'};">
+        ${soon ? '⚠️ ' : '📅 '}Próximo resultado estimado: <b>${data.estimated_next_date}</b>
+        (${data.days_until_estimated >= 0 ? `en ${data.days_until_estimated} días` : 'ya debería haber pasado, puede estar desactualizado'})
+      </div>
+      <div class="stat-sub" style="margin-top:8px;">Último resultado reportado: ${data.last_reported_date}. ${data.note}</div>
+    `;
+  } catch (err) {
+    document.getElementById('earnings-error').textContent = err.message;
+    document.getElementById('earnings-error').classList.remove('hidden');
+  } finally {
+    document.getElementById('earnings-loading').classList.add('hidden');
   }
 });
 document.getElementById('market-refresh-btn').addEventListener('click', async () => {
