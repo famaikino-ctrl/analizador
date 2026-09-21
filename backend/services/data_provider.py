@@ -454,6 +454,8 @@ class AlphaVantageProvider(DataProvider):
             "book_value": _av_num(o.get("BookValue")),
             "earnings_growth": _av_num(o.get("QuarterlyEarningsGrowthYOY")),
             "roic": None,
+            "dividend_date": o.get("DividendDate") if o.get("DividendDate") not in (None, "None", "-") else None,
+            "ex_dividend_date": o.get("ExDividendDate") if o.get("ExDividendDate") not in (None, "None", "-") else None,
         }
 
     def get_analyst_target(self, ticker: str) -> Optional[dict]:
@@ -485,6 +487,36 @@ class AlphaVantageProvider(DataProvider):
         if not rows:
             return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
         return pd.DataFrame(rows).set_index("Date").sort_index()
+
+    def get_earnings_estimate(self, ticker: str) -> dict:
+        """Estima la proxima fecha de resultados trimestrales analizando la
+        cadencia (aprox. 91 dias) entre los ultimos informes reportados.
+        Es una ESTIMACION, no una fecha oficial confirmada por la empresa
+        (para eso habria que consultar la propia empresa o un calendario
+        de resultados dedicado, que esta API gratuita no ofrece de forma
+        confiable)."""
+        from datetime import timedelta
+
+        data = self._request({"function": "EARNINGS", "symbol": ticker.upper()})
+        quarterly = data.get("quarterlyEarnings", [])
+        if not quarterly:
+            return {"available": False, "note": "No hay historial de resultados disponible para estimar la proxima fecha."}
+
+        try:
+            last_date = datetime.strptime(quarterly[0]["reportedDate"], "%Y-%m-%d")
+        except Exception:
+            return {"available": False, "note": "No se pudo interpretar la fecha del ultimo resultado reportado."}
+
+        estimated_next = last_date + timedelta(days=91)
+        days_until = (estimated_next.date() - datetime.now().date()).days
+
+        return {
+            "available": True,
+            "last_reported_date": last_date.strftime("%Y-%m-%d"),
+            "estimated_next_date": estimated_next.strftime("%Y-%m-%d"),
+            "days_until_estimated": days_until,
+            "note": "Fecha ESTIMADA en base a la cadencia trimestral historica, no confirmada oficialmente por la empresa.",
+        }
 
     def get_news(self, ticker: str, limit: int = 8) -> dict:
         """Noticias recientes con sentimiento, via el endpoint NEWS_SENTIMENT

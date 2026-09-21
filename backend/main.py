@@ -137,6 +137,19 @@ def api_news(ticker: str):
     return JSONResponse(content=_sanitize(result))
 
 
+@app.get("/api/earnings/{ticker}")
+def api_earnings(ticker: str):
+    """Estimacion de proxima fecha de resultados trimestrales. Consume 1
+    consulta extra de la cuota diaria; por eso es manual (bajo pedido)."""
+    if not hasattr(provider, "get_earnings_estimate"):
+        raise HTTPException(status_code=501, detail="El proveedor de datos actual no soporta esta funcion.")
+    try:
+        result = provider.get_earnings_estimate(ticker)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo resultados de {ticker}: {exc}")
+    return JSONResponse(content=_sanitize(result))
+
+
 @app.get("/api/backtest/{ticker}")
 def api_backtest(ticker: str, entry_threshold: float = 65, max_holding_days: int = 20, side: str = "long"):
     """Backtest tecnico simplificado sobre el historial disponible (~100
