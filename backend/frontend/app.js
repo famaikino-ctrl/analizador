@@ -59,7 +59,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    ['analysis', 'market', 'compare', 'scanner', 'pullback', 'recommend', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
+    ['analysis', 'market', 'compare', 'scanner', 'pullback', 'recommend', 'risk', 'history', 'backtest', 'portfolio', 'glossary'].forEach(tab => {
       document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== btn.dataset.tab);
     });
     if (btn.dataset.tab === 'history') renderHistory();
@@ -418,7 +418,7 @@ function renderFavoritesStrip() {
       document.getElementById('ticker-input').value = ticker;
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelector('.tab-btn[data-tab="analysis"]').classList.add('active');
-      ['analysis', 'market', 'compare', 'scanner', 'pullback', 'recommend', 'risk', 'history', 'backtest', 'portfolio'].forEach(tab => {
+      ['analysis', 'market', 'compare', 'scanner', 'pullback', 'recommend', 'risk', 'history', 'backtest', 'portfolio', 'glossary'].forEach(tab => {
         document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== 'analysis');
       });
       currentTicker = ticker;
@@ -442,6 +442,60 @@ document.getElementById('favorite-toggle-btn').addEventListener('click', () => {
 });
 
 renderFavoritesStrip();
+
+// ---------------------------------------------------------------------
+// Glosario / Ayuda
+// ---------------------------------------------------------------------
+const GLOSSARY_TERMS = [
+  { term: 'RSI (Índice de Fuerza Relativa)', category: 'Osciladores', text: 'Mide si una acción está "sobrecomprada" (subió mucho, riesgo de corrección) o "sobrevendida" (bajó mucho, posible rebote). Va de 0 a 100. Menos de 30 = sobreventa. Más de 70 = sobrecompra.' },
+  { term: 'MACD', category: 'Osciladores', text: 'Compara dos medias móviles para detectar cambios de momentum. Cuando la línea MACD cruza por encima de su señal, suele leerse como impulso alcista; por debajo, bajista.' },
+  { term: 'Stochastic RSI', category: 'Osciladores', text: 'Una versión "más sensible" del RSI, que reacciona más rápido a cambios de corto plazo. Se usa junto al RSI normal, no en su reemplazo.' },
+  { term: 'ATR (Rango Verdadero Promedio)', category: 'Volatilidad', text: 'Mide qué tan volátil es una acción, en dólares. Se usa para calcular stops y objetivos de forma proporcional a cómo se mueve cada acción (no todas se mueven igual).' },
+  { term: 'ADX', category: 'Volatilidad', text: 'Mide la FUERZA de una tendencia (no su dirección). Por debajo de 20 = mercado lateral/sin tendencia clara. Por encima de 25 = tendencia fuerte, sea alcista o bajista.' },
+  { term: 'Bollinger Bands', category: 'Volatilidad', text: 'Una banda alrededor del precio que se ensancha cuando hay más volatilidad y se achica cuando hay menos. El precio tocando la banda superior o inferior puede indicar sobrecompra/sobreventa relativa.' },
+  { term: 'EMA / SMA (Medias móviles)', category: 'Tendencia', text: 'El precio promedio de los últimos X días. EMA le da más peso a los días recientes; SMA pesa todos los días igual. Sirven para ver la dirección general del precio sin el "ruido" diario.' },
+  { term: 'VWAP', category: 'Tendencia', text: 'Precio promedio ponderado por volumen: da más peso a los precios donde se operó más volumen. Usado sobre todo para operar dentro del mismo día.' },
+  { term: 'OBV (On Balance Volume)', category: 'Volumen', text: 'Acumula el volumen sumando en días de suba y restando en días de baja. Si sube junto con el precio, confirma la tendencia; si diverge del precio, es una alerta.' },
+  { term: 'Volumen relativo', category: 'Volumen', text: 'Compara el volumen de hoy contra el promedio reciente. Por encima de 1.5x significa que se operó mucho más de lo normal — suele acompañar movimientos importantes.' },
+  { term: 'ROC / Momentum', category: 'Volumen', text: 'Mide qué tan rápido cambió el precio en los últimos días. Valores altos y positivos indican impulso alcista fuerte; negativos, impulso bajista.' },
+  { term: 'Soportes y Resistencias', category: 'Niveles', text: 'Precios donde históricamente la acción "rebotó" (soporte, por abajo) o "chocó" (resistencia, por arriba) varias veces. No son líneas mágicas, son zonas donde suele haber más actividad de compra/venta.' },
+  { term: 'Fibonacci', category: 'Niveles', text: 'Niveles de precio calculados matemáticamente sobre un movimiento reciente (23.6%, 38.2%, 50%, 61.8%, etc.) donde el precio suele hacer una pausa o revertir parcialmente.' },
+  { term: 'Pivot Points', category: 'Niveles', text: 'Niveles de referencia calculados con el máximo, mínimo y cierre de la sesión anterior. Muy usados para operar en el corto plazo (day trading).' },
+  { term: 'Score LONG / SHORT', category: 'Scoring', text: 'Un puntaje de 0 a 100 que combina varios indicadores técnicos, fundamentales y de valuación para estimar qué tan favorable se ve una acción para comprar (LONG) o vender en corto (SHORT). Cuanto más alto, más señales apuntan en esa dirección.' },
+  { term: 'Dirección sugerida', category: 'Scoring', text: 'Compara el Score LONG contra el Score SHORT y te dice cuál de los dos domina claramente (o si ninguno lo hace, mostrando "sin dirección clara").' },
+  { term: 'Breakout Score', category: 'Scoring', text: 'Puntaje 0-100 que mide qué tan cerca está una acción de una posible ruptura alcista (momentum + volumen + cercanía a resistencia). No garantiza que la ruptura ocurra.' },
+  { term: 'Trade Style (Estilo de operación)', category: 'Scoring', text: 'Sugerencia de si el perfil actual de la acción (volatilidad, tendencia, fundamentales) encaja más con un trade rápido, un swing trade, o una inversión de largo plazo.' },
+  { term: 'Entrada / Stop Loss / Objetivos', category: 'Plan operativo', text: 'Entrada: precio sugerido para comprar/vender en corto. Stop loss: precio donde cortarías la pérdida si la operación no funciona. Objetivos: precios donde tomarías ganancias.' },
+  { term: 'Relación Riesgo/Beneficio (R:R)', category: 'Plan operativo', text: 'Compara cuánto podés perder contra cuánto podés ganar. Un R:R de 1:3 significa que por cada $1 que arriesgás, buscás ganar $3.' },
+  { term: 'P/E (Precio/Ganancia)', category: 'Fundamentales', text: 'Cuántas veces la ganancia anual por acción está pagando el mercado. Un P/E alto puede indicar que se espera mucho crecimiento (o que está cara); uno bajo, lo contrario.' },
+  { term: 'ROE / ROA', category: 'Fundamentales', text: 'ROE: qué tan eficiente es la empresa generando ganancias con el capital de sus accionistas. ROA: lo mismo pero con el total de sus activos. Más alto suele ser mejor.' },
+  { term: 'EV/EBITDA', category: 'Fundamentales', text: 'Compara el valor total de la empresa (deuda incluida) contra sus ganancias operativas. Se usa para comparar empresas de un mismo sector entre sí.' },
+  { term: 'Precio Objetivo', category: 'Valuación', text: 'Estimación de a qué precio "debería" cotizar la acción, combinando varios métodos (múltiplos, DCF simplificado, consenso de analistas). No es una promesa de que llegue ahí.' },
+  { term: 'Win Rate', category: 'Backtest', text: 'El porcentaje de operaciones simuladas que resultaron ganadoras sobre el total.' },
+  { term: 'Profit Factor', category: 'Backtest', text: 'Cuánto ganaste en total en las operaciones buenas dividido cuánto perdiste en las malas. Por encima de 1 significa que ganaste más de lo que perdiste.' },
+  { term: 'Sharpe / Sortino (simplificados)', category: 'Backtest', text: 'Miden el retorno obtenido en relación al riesgo/volatilidad asumido. Sortino solo penaliza las pérdidas, no las subidas fuertes. En esta app son versiones simplificadas por operación, no el cálculo diario "oficial" que usan los profesionales.' },
+  { term: 'Máximo Drawdown', category: 'Backtest', text: 'La caída más grande que sufrió la simulación desde su punto más alto hasta su punto más bajo. Mide cuánto "dolor" pudiste haber sentido en el camino.' },
+  { term: 'Expectativa por operación', category: 'Backtest', text: 'El resultado promedio esperado por cada operación, combinando el porcentaje de aciertos y cuánto se gana/pierde en cada caso. Positivo significa ventaja matemática.' },
+  { term: 'N/D', category: 'General', text: 'Significa "No Disponible": la app no tiene ese dato para ese ticker en este momento (por ejemplo, por las limitaciones del plan gratuito de datos). Nunca se inventa un valor.' },
+];
+
+function renderGlossary(filter = '') {
+  const f = filter.toLowerCase();
+  const filtered = GLOSSARY_TERMS.filter(g => g.term.toLowerCase().includes(f) || g.text.toLowerCase().includes(f) || g.category.toLowerCase().includes(f));
+  const categories = [...new Set(filtered.map(g => g.category))];
+  document.getElementById('glossary-list').innerHTML = categories.map(cat => `
+    <div class="section-heading">${cat}</div>
+    ${filtered.filter(g => g.category === cat).map(g => `
+      <div class="card" style="margin-bottom:10px;">
+        <div style="font-weight:700;font-size:14px;">${g.term}</div>
+        <div class="stat-sub" style="margin-top:4px;">${g.text}</div>
+      </div>
+    `).join('')}
+  `).join('') || '<div class="stat-sub" style="padding:20px 0;">No se encontraron términos con esa búsqueda.</div>';
+}
+
+document.getElementById('glossary-search').addEventListener('input', (e) => renderGlossary(e.target.value));
+renderGlossary();
 
 // ---------------------------------------------------------------------
 // Exportar a PDF (via Imprimir del navegador)
