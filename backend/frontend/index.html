@@ -570,6 +570,15 @@
         <div id="sector-bars"></div>
       </div>
     </div>
+    <div class="card hidden" id="correlation-wrap" style="margin-top:16px;">
+      <div class="card-title">Correlación entre posiciones</div>
+      <p class="stat-sub">Qué tan parecido se mueve el precio de cada par de acciones (día a día). Cerca de 1 = se mueven casi idénticas (poca diversificación real); cerca de 0 = independientes; negativo = se mueven en contra.</p>
+      <div id="correlation-warnings" style="margin-top:10px;"></div>
+      <div style="overflow-x:auto;margin-top:10px;">
+        <table id="correlation-table"><tbody></tbody></table>
+      </div>
+      <div id="correlation-note" class="stat-sub" style="margin-top:8px;"></div>
+    </div>
     <div class="card hidden" id="portfolio-results" style="margin-top:16px;">
       <table>
         <thead><tr>

@@ -1299,6 +1299,40 @@ document.getElementById('calc-portfolio-btn').addEventListener('click', async ()
       `<div class="risk-warning">⚠️ ${w}</div>`
     ).join('');
 
+    // Correlación entre posiciones
+    const corr = data.correlation;
+    if (corr && corr.matrix && Object.keys(corr.matrix).length) {
+      const tickers = Object.keys(corr.matrix);
+      const corrColor = (v) => {
+        const av = Math.abs(v);
+        if (v >= 0.85) return 'rgba(255,92,114,.55)';
+        if (v >= 0.7) return 'rgba(255,92,114,.3)';
+        if (v <= -0.5) return 'rgba(47,217,138,.3)';
+        if (av < 0.3) return 'transparent';
+        return 'rgba(240,180,41,.2)';
+      };
+      let tableHtml = '<thead><tr><th></th>' + tickers.map(t => `<th>${t}</th>`).join('') + '</tr></thead><tbody>';
+      tickers.forEach(t1 => {
+        tableHtml += `<tr><th class="text-cell">${t1}</th>` +
+          tickers.map(t2 => `<td style="background:${corrColor(corr.matrix[t1][t2])};text-align:center;">${corr.matrix[t1][t2].toFixed(2)}</td>`).join('') +
+          '</tr>';
+      });
+      tableHtml += '</tbody>';
+      document.getElementById('correlation-table').innerHTML = tableHtml;
+
+      document.getElementById('correlation-warnings').innerHTML = (corr.high_correlation_pairs || []).map(p =>
+        `<div class="risk-warning">⚠️ ${p.ticker_a} y ${p.ticker_b} tienen correlación ${p.level === 'muy_alta' ? 'muy alta' : 'alta'} (${p.correlation}) — se mueven de forma muy parecida, aportan menos diversificación de lo que parece.</div>`
+      ).join('') || '<div class="stat-sub">No se detectaron pares con correlación alta.</div>';
+
+      document.getElementById('correlation-note').textContent = `Calculado sobre ${corr.sample_days} días en común entre las posiciones.`;
+      document.getElementById('correlation-wrap').classList.remove('hidden');
+    } else if (corr && corr.note) {
+      document.getElementById('correlation-table').innerHTML = '';
+      document.getElementById('correlation-warnings').innerHTML = '';
+      document.getElementById('correlation-note').textContent = corr.note;
+      document.getElementById('correlation-wrap').classList.remove('hidden');
+    }
+
     document.getElementById('portfolio-summary').classList.remove('hidden');
     document.getElementById('portfolio-results').classList.remove('hidden');
   } catch (err) {
