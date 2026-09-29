@@ -15,6 +15,7 @@ from notifications import run_daily_alert_check, send_telegram_message, send_ema
 from market_overview import get_market_snapshot
 from backtest import run_backtest
 from pullback_scanner import check_ema_pullback_buy, check_resistance_or_ath_sell
+from portfolio_analytics import compute_correlation_matrix
 
 app = FastAPI(title="Stock Analyzer API")
 
@@ -389,6 +390,7 @@ def api_portfolio(positions: List[dict] = Body(...)):
 
     enriched = []
     total_value = 0.0
+    closes_by_ticker = {}
     for pos in positions:
         ticker = str(pos.get("ticker", "")).strip().upper()
         quantity = float(pos.get("quantity", 0) or 0)
@@ -403,6 +405,8 @@ def api_portfolio(positions: List[dict] = Body(...)):
         if "error" in data:
             enriched.append({"ticker": ticker, "error": data["error"]})
             continue
+
+        closes_by_ticker[ticker] = data["chart"]["candles"]
 
         current_price = data["quote"].get("price") or 0
         current_value = current_price * quantity
@@ -462,11 +466,14 @@ def api_portfolio(positions: List[dict] = Body(...)):
         for s in sector_breakdown if s["concentration_risk"] in ("alta", "muy_alta")
     ]
 
+    correlation = compute_correlation_matrix(closes_by_ticker)
+
     return JSONResponse(content=_sanitize({
         "positions": enriched,
         "total_value": round(total_value, 2),
         "sector_breakdown": sector_breakdown,
         "concentration_warnings": concentration_warnings,
+        "correlation": correlation,
     }))
 
 
