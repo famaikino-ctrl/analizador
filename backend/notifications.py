@@ -129,18 +129,37 @@ def _format_alert_html(ticker: str, data: dict) -> str:
 
 def run_daily_alert_check(provider) -> dict:
     """Recorre ALERT_TICKERS, analiza cada uno, y manda un mensaje de
-    Telegram para los que muestren LONG o SHORT con score >= ALERT_MIN_SCORE.
-    Devuelve un resumen de lo que se envio (para loguear/depurar)."""
+    Telegram/Email para los que muestren LONG o SHORT con score >=
+    ALERT_MIN_SCORE. Tambien chequea el contexto general del mercado
+    (SPY/QQQ) y evita mandar señales LONG si el mercado esta claramente
+    bajista (o SHORT si esta claramente alcista) -- no tiene sentido ir
+    contra la marea general. Devuelve un resumen de lo enviado."""
     from analysis import analyze_ticker  # import local para evitar ciclos
+    from market_overview import get_market_snapshot
 
     tickers_raw = os.environ.get("ALERT_TICKERS", "")
-    tickers = [t.strip().upper() for t in tickers_raw.split(",") if t.strip()][:10]
+    tickers = [t.strip().upper() for t in tickers_raw.split(",") if t.strip()][:8]
     min_score = float(os.environ.get("ALERT_MIN_SCORE", "60"))
 
     today_key = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     sent = []
     skipped = []
     errors = []
+
+    try:
+        market = get_market_snapshot(provider)
+        market_context = market.get("context", {}).get("label", "N/D")
+    except Exception:
+        market_context = "N/D"
+
+    dedup_market_key = f"{today_key}:market_context"
+    if not _already_sent_today.get(dedup_market_key):
+        market_msg = f"🌍 Contexto de mercado hoy: <b>{market_context}</b> (SPY/QQQ)"
+        if os.environ.get("TELEGRAM_BOT_TOKEN"):
+            send_telegram_message(market_msg)
+        if os.environ.get("SMTP_HOST"):
+            send_email("StockLens - Contexto de mercado", f"<p>{market_msg}</p>")
+        _already_sent_today[dedup_market_key] = True
 
     for ticker in tickers:
         try:
@@ -160,6 +179,13 @@ def run_daily_alert_check(provider) -> dict:
         score = data["score"]["total"] if direction == "LONG" else data["short_score"]["total"]
         if score < min_score:
             skipped.append(ticker)
+            continue
+
+        if direction == "LONG" and market_context == "Bajista":
+            skipped.append(f"{ticker} (LONG omitido: mercado general bajista)")
+            continue
+        if direction == "SHORT" and market_context == "Alcista":
+            skipped.append(f"{ticker} (SHORT omitido: mercado general alcista)")
             continue
 
         dedup_key = f"{today_key}:{ticker}:{direction}"

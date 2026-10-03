@@ -12,6 +12,7 @@ from levels.fibonacci import compute_fibonacci, match_fib_with_levels
 from valuation.price_target import compute_price_target
 from scoring.score import compute_score
 from scoring.short_score import compute_short_score, determine_direction
+from confluence import compute_confluence
 from scoring.signals import signal_from_score, multi_horizon_trend, build_alerts, build_conclusion, build_short_conclusion, classify_trade_style
 from scoring.scanner import compute_breakout_score, compute_momentum_5d
 from strategies.entry_strategies import build_strategies, build_short_strategies
@@ -179,6 +180,24 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
     )
     direction = determine_direction(score["total"], short_score["total"])
 
+    # ---------- Confluencia de señales ----------
+    nearest_level_favorable = None
+    if direction["direction"] == "LONG" and nearest_support:
+        nearest_level_favorable = abs(nearest_support["distance_pct"]) <= 5
+    elif direction["direction"] == "SHORT" and nearest_resistance:
+        nearest_level_favorable = abs(nearest_resistance["distance_pct"]) <= 5
+
+    upside_pct = price_target.get("upside_pct")
+    valuation_favorable = None
+    if upside_pct is not None:
+        valuation_favorable = upside_pct > 0 if direction["direction"] == "LONG" else upside_pct < 0
+
+    confluence = compute_confluence(
+        direction["direction"], ema_flags, macd_info, rsi_interp,
+        vol_abnormal, quote.get("change_pct"), nearest_level_favorable,
+        fundamentals_ok, valuation_favorable,
+    )
+
     short_conclusion = build_short_conclusion(short_score, trends, current_price, atr_value,
                                                nearest_support, nearest_resistance)
     short_strategies = build_short_strategies(current_price, atr_value, ma_last["ema20"], ma_last["ema50"],
@@ -287,6 +306,7 @@ def analyze_ticker(provider: DataProvider, ticker: str, timeframe: str = "1Y") -
         "signal": signal,
         "short_score": short_score,
         "direction": direction,
+        "confluence": confluence,
         "trends": trends,
         "alerts": alerts,
         "conclusion": conclusion,
