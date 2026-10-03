@@ -98,6 +98,16 @@
         </div>
       </div>
 
+      <!-- CONFLUENCIA DE SEÑALES -->
+      <div class="card" style="margin-bottom:16px;" id="confluence-card">
+        <div class="card-title">Confluencia de señales <span style="font-weight:400;color:var(--text-faint);">(no es una probabilidad de éxito)</span></div>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <span class="pill" id="confluence-level-pill" style="font-size:13px;">—</span>
+          <div class="stat-sub" id="confluence-count">—</div>
+        </div>
+        <div id="confluence-factors" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+
       <!-- TENDENCIA / SCORE / SEÑAL -->
       <div class="grid grid-3">
         <div class="card">
@@ -453,7 +463,9 @@
         <span class="mono">TELEGRAM_CHAT_ID</span>. Para Email: <span class="mono">SMTP_HOST</span>, <span class="mono">SMTP_PORT</span>,
         <span class="mono">SMTP_USER</span>, <span class="mono">SMTP_PASSWORD</span>, <span class="mono">ALERT_EMAIL_TO</span>.
         En ambos casos, además: <span class="mono">ALERT_TICKERS</span>, <span class="mono">ALERT_MIN_SCORE</span>,
-        <span class="mono">ALERT_CHECK_HOUR_UTC</span>. Corre 1 vez al día automáticamente. Usá los botones de abajo para probar sin esperar.
+        <span class="mono">ALERT_CHECK_HOUR_UTC</span>. Corre 1 vez al día automáticamente (máximo 8 tickers). Cada chequeo manda primero
+        un mensaje con el contexto general del mercado (SPY/QQQ), y evita mandarte señales LONG si el mercado está claramente bajista
+        (o SHORT si está claramente alcista). Usá los botones de abajo para probar sin esperar.
       </p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
         <button class="btn btn-ghost" id="test-telegram-btn">Enviar mensaje de prueba (Telegram)</button>

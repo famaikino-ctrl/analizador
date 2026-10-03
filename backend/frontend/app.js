@@ -169,6 +169,17 @@ function renderAnalysis(d) {
   document.getElementById('score-long-mini').textContent = `${d.score.total} (${d.score.label})`;
   document.getElementById('score-short-mini').textContent = `${d.short_score.total} (${d.short_score.label})`;
 
+  // Confluencia de señales
+  const conf = d.confluence;
+  const confPill = document.getElementById('confluence-level-pill');
+  confPill.textContent = conf.level;
+  confPill.className = 'pill ' + pillClass(conf.color);
+  document.getElementById('confluence-count').textContent =
+    conf.total_checked ? `${conf.agreeing} de ${conf.total_checked} factores coinciden con la dirección sugerida` : '—';
+  document.getElementById('confluence-factors').innerHTML = (conf.factors || []).map(f => `
+    <span class="pill ${f.agrees ? 'pill-green' : 'pill-gray'}">${f.agrees ? '✓' : '✗'} ${f.name}</span>
+  `).join('');
+
   // Señal
   const sigEl = document.getElementById('signal-value');
   sigEl.textContent = (d.signal.signal === 'COMPRA' ? '🟢 ' : d.signal.signal === 'ESPERAR' ? '🟡 ' : '🔴 ') + d.signal.signal;
